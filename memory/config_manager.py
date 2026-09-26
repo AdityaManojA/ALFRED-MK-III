@@ -28,6 +28,8 @@ def save_api_keys(gemini_api_key: str) -> None:
             data = {}
 
     data["gemini_api_key"] = gemini_api_key.strip()
+    if "os_system" not in data:
+        data["os_system"] = "windows" if sys.platform.startswith("win") else ("mac" if sys.platform == "darwin" else "linux")
 
     CONFIG_FILE.write_text(
         json.dumps(data, indent=2),

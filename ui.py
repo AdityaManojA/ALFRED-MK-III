@@ -6427,6 +6427,38 @@ class MainWindow(QMainWindow):
         self._directives_btn.clicked.connect(self._open_directives)
         lay.addWidget(self._directives_btn)
 
+        # Sentry Monitoring Toggle Button
+        self._sentry_btn = QPushButton("[ ▣ ]  SENTRY MODE")
+        self._sentry_btn.setFixedHeight(30)
+        self._sentry_btn.setFont(mono_font(8, QFont.Weight.Bold, letter_spacing=0.6))
+        self._sentry_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._sentry_btn.setToolTip("Continuous Visual Context Monitoring")
+        self._sentry_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2};
+                color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER_A};
+                border-radius: 2px;
+                padding: 0 12px;
+            }}
+            QPushButton:hover {{
+                background: rgba(142, 155, 255, 0.14);
+                color: #ffffff;
+                border: 1px solid {C.PRI};
+            }}
+            QPushButton:pressed {{
+                background: rgba(142, 155, 255, 0.25);
+            }}
+            QPushButton:checked {{
+                color: {C.DARK};
+                border: 1px solid {C.PRI};
+                background: {C.PRI};
+            }}
+        """)
+        self._sentry_btn.setCheckable(True)
+        self._sentry_btn.clicked.connect(self._toggle_sentry_mode)
+        lay.addWidget(self._sentry_btn)
+
         lay.addStretch()
 
         mid = QVBoxLayout(); mid.setSpacing(2)
@@ -8317,6 +8349,15 @@ class MainWindow(QMainWindow):
                 }}
             """)
 
+    def _toggle_sentry_mode(self, checked: bool) -> None:
+        """Toggle continuous visual context (camera stream) monitoring."""
+        if checked:
+            self.start_camera_stream()
+            self._log.append_log("SYS: Sentry Mode engaged — continuous visual context monitoring active.")
+        else:
+            self.stop_camera_stream()
+            self._log.append_log("SYS: Sentry Mode disengaged — optical recon offline.")
+
     def _send(self):
         txt = self._input.text().strip()
         if not txt: return
@@ -8354,10 +8395,29 @@ class MainWindow(QMainWindow):
         super().closeEvent(e)
 
     def _check_config(self) -> bool:
-        if not API_FILE.exists(): return False
+        if not API_FILE.exists():
+            env_key = os.environ.get("GEMINI_API_KEY")
+            if env_key:
+                try:
+                    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+                    detected_os = "windows" if sys.platform.startswith("win") else ("mac" if sys.platform == "darwin" else "linux")
+                    API_FILE.write_text(json.dumps({"gemini_api_key": env_key, "os_system": detected_os}, indent=4), encoding="utf-8")
+                    return True
+                except Exception:
+                    pass
+            return False
         try:
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            return bool(d.get("gemini_api_key")) and bool(d.get("os_system"))
+            key = d.get("gemini_api_key") or d.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+            if not key:
+                return False
+            if not d.get("os_system"):
+                d["os_system"] = "windows" if sys.platform.startswith("win") else ("mac" if sys.platform == "darwin" else "linux")
+                try:
+                    API_FILE.write_text(json.dumps(d, indent=4), encoding="utf-8")
+                except Exception:
+                    pass
+            return True
         except Exception:
             return False
 

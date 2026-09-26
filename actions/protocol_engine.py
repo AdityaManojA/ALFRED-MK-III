@@ -495,11 +495,18 @@ TOOL = {
             },
             "steps": {
                 "type": "ARRAY",
-                "description": "List of step definitions for workflow creation. Each step has 'tool', 'parameters', and optional 'sleep_ms'."
+                "description": "List of step definitions for workflow creation. Each step has 'tool', 'parameters', and optional 'sleep_ms'.",
+                "items": {
+                    "type": "OBJECT",
+                    "description": "A single workflow step with 'tool' (string), 'parameters' (object), and optional 'sleep_ms' (integer)."
+                }
             },
             "triggers": {
                 "type": "ARRAY",
-                "description": "Voice trigger phrases that activate this protocol (e.g. ['FCC CLAUDE', 'start fcc claude'])."
+                "description": "Voice trigger phrases that activate this protocol (e.g. ['FCC CLAUDE', 'start fcc claude']).",
+                "items": {
+                    "type": "STRING"
+                }
             },
             "description": {
                 "type": "STRING",
