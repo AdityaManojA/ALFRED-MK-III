@@ -35,7 +35,7 @@ class TestScreenFindHybridGrounding(unittest.TestCase):
             d.text((30, y), f"// Code line at y={y}: let val = 42;", fill=(100, 180, 120))
 
         # Warm up OCR once to eliminate one-time engine spin-up
-        find_element("File", screenshot=cls.editor_img)
+        find_element("Save", screenshot=cls.editor_img)
 
     def test_find_element_save_sub_150ms_without_gemini(self):
         """

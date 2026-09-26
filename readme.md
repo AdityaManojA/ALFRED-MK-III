@@ -168,6 +168,8 @@ ALFRED is designed around uncompromising principles of system integrity, process
 ## 🎵 4. Dynamic Background Audio Matrix & Voice-Ducked Sound System
 
 * **Integrated Ambient Sound Dock**: Dedicated cybernetic background soundtrack player at the bottom-left of the HUD with custom music loading and seamless loop playback.
+* **Featured Soundtrack — The Son of Flynn (From TRON: Legacy Score)**:
+  > *"It's one of my fav childhood movies, the graphical interface and intelligence development of the tech field reminded me of the movie I watched when I was a kid, so I decided to throw this one in while I work. You guys can swap it out, remove it entirely, or add more to it!"* — **Aditya Manoj**
 * **Intelligent Speech Ducking**: Continuously monitors TTS speech output. Background audio plays at a crisp 10% volume normally and dynamically ducks to 5% whenever ALFRED speaks, returning smoothly upon turn completion.
 * **Audio-Reactive Waveform Controls**: Replaced generic media playback glyphs with high-tech graphic equalizer lines that animate in sync with active playback.
 * **Popup Gain Slider HUD**: Floating real-time volume slider for instantaneous gain adjustments directly on click without opening deep settings menus.
