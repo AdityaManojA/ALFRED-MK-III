@@ -7990,12 +7990,55 @@ class MainWindow(QMainWindow):
             return False
 
         try:
-            ico = QIcon(resolved_path)
+            p_res = Path(resolved_path)
+            ico_file = p_res.with_suffix(".ico")
+            if not ico_file.exists():
+                try:
+                    from PIL import Image
+                    img = Image.open(resolved_path)
+                    img.save(ico_file, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+                except Exception:
+                    pass
+
+            if ico_file.exists():
+                ico = QIcon(str(ico_file))
+            else:
+                ico = QIcon()
+                pm = QPixmap(resolved_path)
+                if not pm.isNull():
+                    for sz in (16, 24, 32, 48, 64, 128, 256):
+                        ico.addPixmap(pm.scaled(sz, sz, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+
             if not ico.isNull():
                 self.setWindowIcon(ico)
                 app = QApplication.instance()
                 if app:
                     app.setWindowIcon(ico)
+
+                # Native Win32 Taskbar icon injection
+                if sys.platform == "win32":
+                    try:
+                        import ctypes
+                        WM_SETICON = 0x0080
+                        ICON_SMALL = 0
+                        ICON_BIG = 1
+                        LR_LOADFROMFILE = 0x0010
+                        IMAGE_ICON = 1
+                        target_ico_str = str(ico_file if ico_file.exists() else resolved_path)
+                        hicon_big = ctypes.windll.user32.LoadImageW(
+                            0, target_ico_str, IMAGE_ICON, 32, 32, LR_LOADFROMFILE
+                        )
+                        hicon_small = ctypes.windll.user32.LoadImageW(
+                            0, target_ico_str, IMAGE_ICON, 16, 16, LR_LOADFROMFILE
+                        )
+                        hwnd = int(self.winId())
+                        if hicon_big:
+                            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+                        if hicon_small:
+                            ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+                    except Exception:
+                        pass
+
                 self._current_icon_path = resolved_path
                 from memory.config_manager import save_app_icon
                 save_app_icon(resolved_path)
@@ -8360,7 +8403,7 @@ class JarvisUI:
         if sys.platform == "win32":
             try:
                 import ctypes
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("alfred.wayne.batcomputer.v2")
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("alfred.wayne.batcomputer.mk3")
             except Exception:
                 pass
         self._app = QApplication.instance() or QApplication(sys.argv)

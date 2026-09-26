@@ -1,6 +1,14 @@
 import platform as _platform
 import subprocess as _subprocess
 
+# ── Force Windows to decouple taskbar icon from generic python.exe ─────────────
+if _platform.system() == "Windows":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("alfred.wayne.batcomputer.mk3")
+    except Exception:
+        pass
+
 # ── Nuclear: force CREATE_NO_WINDOW on EVERY subprocess call on Windows ───────
 # This patches Popen itself, so no per-file flag is needed anywhere.
 if _platform.system() == "Windows":
