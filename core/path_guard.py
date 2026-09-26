@@ -49,14 +49,16 @@ def is_heavenly_restricted(val: Any) -> bool:
         if t in s:
             return True
 
-    try:
-        p = Path(str(val)).resolve()
-        for res_target in (Path(r"D:\Projects\Personal-Assistant"), Path(r"D:\Projects\Alfred-Mark-II")):
-            restricted = res_target.resolve()
-            if p == restricted or restricted in p.parents:
-                return True
-    except Exception:
-        pass
+    # Only test filesystem path resolution if val looks like a file/directory path
+    if any(c in s for c in ("\\", "/", ":")) or s.startswith("."):
+        try:
+            p = Path(str(val)).resolve()
+            for res_target in (Path(r"D:\Projects\Personal-Assistant"), Path(r"D:\Projects\Alfred-Mark-II")):
+                restricted = res_target.resolve()
+                if p == restricted or restricted in p.parents:
+                    return True
+        except Exception:
+            pass
 
     return False
 

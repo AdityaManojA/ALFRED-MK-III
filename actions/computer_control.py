@@ -325,45 +325,16 @@ def _focus_window(title: str) -> str:
     return f"focus_window: unknown OS '{os_name}'"
 
 def _screen_find(description: str) -> tuple[int, int] | None:
-    api_key = _get_api_key()
-    if not api_key:
-        print("\033[91m[ComputerControl]\033[0m \033[91m[warn]\033[0m No API key for screen_find")
-        return None
-
     try:
-        from google import genai
-        from google.genai import types as gtypes
-
-        _require_pyautogui()
-        w, h  = pyautogui.size()
-        img   = pyautogui.screenshot()
-        buf   = io.BytesIO()
-        img.save(buf, format="PNG")
-        image_bytes = buf.getvalue()
-
-        prompt = (
-            f"This is a screenshot of a {w}×{h} pixel screen. "
-            f"Locate the UI element described as: '{description}'. "
-            f"Reply with ONLY the center coordinates as: x,y "
-            f"If the element is not visible, reply: NOT_FOUND"
-        )
-
-        from core import gemini
-        response = gemini.call(
-            [gtypes.Part.from_bytes(data=image_bytes, mime_type="image/png"), prompt],
-            tier=gemini.FAST, timeout_ms=20_000,
-        )
-        if response is None:
-            return None
-
-        text = (response.text or "").strip()
-        if "NOT_FOUND" in text.upper():
-            return None
-
-        match = re.search(r"(\d+)\s*,\s*(\d+)", text)
-        if match:
-            return int(match.group(1)), int(match.group(2))
-
+        from actions.screen_find import find_element
+        coords = find_element(description)
+        if coords:
+            _require_pyautogui()
+            w, h = pyautogui.size()
+            nx, ny = float(coords[0]), float(coords[1])
+            px = int(nx * w) if 0.0 <= nx <= 1.0 else int(nx)
+            py = int(ny * h) if 0.0 <= ny <= 1.0 else int(ny)
+            return px, py
     except Exception as e:
         print(f"\033[91m[ComputerControl]\033[0m \033[91m[warn]\033[0m screen_find failed: {e}")
 
