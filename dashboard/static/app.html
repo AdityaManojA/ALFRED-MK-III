@@ -1305,16 +1305,35 @@
         });
       }
     }
-    window.addEventListener('resize', initBgParticles);
+    let _resizeTimer = null;
+    function debouncedResize() {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => {
+        initBgParticles();
+        initReactorParticles();
+      }, 250);
+    }
+    window.addEventListener('resize', debouncedResize, { passive: true });
+
+    let _tickingMove = false;
     window.addEventListener('mousemove', e => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-      targetTiltX = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
-      targetTiltY = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
-    });
+      if (!_tickingMove) {
+        _tickingMove = true;
+        requestAnimationFrame(() => {
+          mouseX = e.clientX;
+          mouseY = e.clientY;
+          targetTiltX = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+          targetTiltY = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+          _tickingMove = false;
+        });
+      }
+    }, { passive: true });
 
     function drawBgParticles() {
-      if (!bgCtx) return;
+      if (!bgCtx || document.hidden) {
+        requestAnimationFrame(drawBgParticles);
+        return;
+      }
       const w = bgCanvas.width;
       const h = bgCanvas.height;
       bgCtx.clearRect(0, 0, w, h);
@@ -1400,12 +1419,14 @@
 
     function setupHiDPI(c, ctx, cssW, cssH) {
       const dpr = window.devicePixelRatio || 1;
-      if (c.width !== cssW * dpr || c.height !== cssH * dpr) {
-        c.width = cssW * dpr;
-        c.height = cssH * dpr;
+      const targetW = Math.round(cssW * dpr);
+      const targetH = Math.round(cssH * dpr);
+      if (c.width !== targetW || c.height !== targetH) {
+        c.width = targetW;
+        c.height = targetH;
+        ctx.resetTransform ? ctx.resetTransform() : ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
       }
-      ctx.resetTransform ? ctx.resetTransform() : ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
     }
 
     function renderArcReactor(ctx, cssW, cssH, isMini = false) {
@@ -1676,6 +1697,10 @@
     }
 
     function animateReactors() {
+      if (document.hidden) {
+        requestAnimationFrame(animateReactors);
+        return;
+      }
       const speed = 1.0 + (isSpeaking ? 1.6 : 0.0) + reactorAmp * 2.2;
       phase += 1.2 * speed;
 
@@ -1723,13 +1748,43 @@
     function addIntelNoteToVault(item) {
       intelNotesList.push(item);
       updateIntelBadge(intelNotesList.length);
-      renderIntelList();
+      appendIntelCard(item);
 
       if (activeTab !== 'intel') {
         const intelBtn = document.getElementById('tab-intel-btn');
-        intelBtn.style.borderColor = '#ffb800';
-        setTimeout(() => { intelBtn.style.borderColor = ''; }, 2000);
+        if (intelBtn) {
+          intelBtn.style.borderColor = '#ffb800';
+          setTimeout(() => { intelBtn.style.borderColor = ''; }, 2000);
+        }
       }
+    }
+
+    function createIntelCardElement(n) {
+      const ntype = (n.type || 'note').toLowerCase();
+      let contentHtml = escapeHtml(n.content || '');
+      contentHtml = contentHtml.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+      if (ntype === 'code') contentHtml = `<pre>${contentHtml}</pre>`;
+
+      const card = document.createElement('div');
+      card.className = `intel-card card-${ntype}`;
+      card.innerHTML = `
+        <div class="intel-card-top">
+          <span class="intel-badge badge-${ntype}">[${ntype.toUpperCase()}]</span>
+          <span class="intel-time">${escapeHtml(n.time || '')}</span>
+        </div>
+        <div class="intel-card-title">${escapeHtml(n.title || 'Untitled')}</div>
+        <div class="intel-card-body">${contentHtml.replace(/\\n/g, '<br>')}</div>
+      `;
+      return card;
+    }
+
+    function appendIntelCard(item) {
+      const container = document.getElementById('intel-list');
+      if (!container) return;
+      const placeholder = container.querySelector('.intel-empty');
+      if (placeholder) container.innerHTML = '';
+      container.appendChild(createIntelCardElement(item));
+      requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
     }
 
     function renderIntelList() {
@@ -1737,7 +1792,7 @@
       if (!container) return;
       if (intelNotesList.length === 0) {
         container.innerHTML = `
-          <div style="font-family: -apple-system, sans-serif; color: rgba(0, 240, 255, 0.45); text-align: center; margin-top: 40px;">
+          <div class="intel-empty" style="font-family: -apple-system, sans-serif; color: rgba(0, 240, 255, 0.45); text-align: center; margin-top: 40px;">
             <div style="font-size: 24px; margin-bottom: 8px;">📝</div>
             <div style="font-size: 12px; font-weight: 700; letter-spacing: 1px;">INTEL VAULT READY</div>
             <div style="font-size: 11px; color: var(--muted); margin-top: 6px;">Special notes, links, and code snippets from Alfred will appear here.</div>
@@ -1746,25 +1801,11 @@
         return;
       }
 
-      container.innerHTML = intelNotesList.map(n => {
-        const ntype = (n.type || 'note').toLowerCase();
-        let contentHtml = escapeHtml(n.content || '');
-        // Linkify URLs
-        contentHtml = contentHtml.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-        if (ntype === 'code') contentHtml = `<pre>${contentHtml}</pre>`;
-
-        return `
-          <div class="intel-card card-${ntype}">
-            <div class="intel-card-top">
-              <span class="intel-badge badge-${ntype}">[${ntype.toUpperCase()}]</span>
-              <span class="intel-time">${escapeHtml(n.time || '')}</span>
-            </div>
-            <div class="intel-card-title">${escapeHtml(n.title || 'Untitled')}</div>
-            <div class="intel-card-body">${contentHtml.replace(/\\n/g, '<br>')}</div>
-          </div>
-        `;
-      }).join('');
-      container.scrollTop = container.scrollHeight;
+      const frag = document.createDocumentFragment();
+      intelNotesList.forEach(n => frag.appendChild(createIntelCardElement(n)));
+      container.innerHTML = '';
+      container.appendChild(frag);
+      requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
     }
 
     function copyIntelNotes() {
@@ -2001,6 +2042,33 @@
       }
     }
 
+    let _scrollPending = false;
+    function scrollToBottom() {
+      if (_scrollPending) return;
+      _scrollPending = true;
+      requestAnimationFrame(() => {
+        feed.scrollTop = feed.scrollHeight;
+        _scrollPending = false;
+      });
+    }
+
+    function trimFeedIfNeeded() {
+      const maxNodes = 120;
+      const welcome = document.getElementById('feed-welcome');
+      while (feed.children.length > maxNodes) {
+        const first = feed.firstElementChild;
+        if (first === welcome) {
+          if (feed.children.length > 1) {
+            feed.removeChild(feed.children[1]);
+          } else {
+            break;
+          }
+        } else {
+          feed.removeChild(first);
+        }
+      }
+    }
+
     function append(speaker, text) {
       if (text === undefined || text === null || text === '') return;
       const sp = (speaker || '').toLowerCase();
@@ -2013,7 +2081,7 @@
         d.className = 'msg msg-j';
         d.innerHTML = `
           <div class="msg-header">
-            <span class="lbl">ALFRED // WAYNE MK-II</span>
+            <span class="lbl">ALFRED // WAYNE MK-III</span>
             <span class="msg-time">${timeStr}</span>
           </div>
           <div class="msg-text">${esc(text)}</div>
@@ -2036,9 +2104,8 @@
         `;
       }
       feed.appendChild(d);
-      requestAnimationFrame(() => {
-        feed.scrollTop = feed.scrollHeight;
-      });
+      trimFeedIfNeeded();
+      scrollToBottom();
     }
 
     function appendTelemetry(tag, icon, text) {
@@ -2047,18 +2114,16 @@
       const iconHtml = icon ? `<span class="tag-red">[${esc(icon)}]</span>` : '';
       d.innerHTML = `<span class="tag-red">[${esc(tag || 'ALFRED')}]</span> ${iconHtml}<span>${esc(text || '')}</span>`;
       feed.appendChild(d);
-      requestAnimationFrame(() => {
-        feed.scrollTop = feed.scrollHeight;
-      });
+      trimFeedIfNeeded();
+      scrollToBottom();
     }
 
     function sys(text) {
       const d = document.createElement('div');
       d.className = 'msg msg-sys'; d.textContent = `[SYS] ${text}`;
       feed.appendChild(d);
-      requestAnimationFrame(() => {
-        feed.scrollTop = feed.scrollHeight;
-      });
+      trimFeedIfNeeded();
+      scrollToBottom();
     }
 
     function esc(s) {

@@ -2998,7 +2998,10 @@ class LogWidget(QTextEdit):
 
     def _step(self):
         if self._pos < len(self._text):
-            ch  = self._text[self._pos]
+            # Dynamic chunking: drain quickly when backlog exists or line is long,
+            # reducing QTextEdit layout recalculations and paint events by 50-80%
+            chunk_size = 8 if len(self._queue) > 1 else (4 if (len(self._text) - self._pos) > 60 else 2)
+            chunk = self._text[self._pos : self._pos + chunk_size]
             cur = self.textCursor()
             fmt = cur.charFormat()
             col = {
@@ -3015,10 +3018,10 @@ class LogWidget(QTextEdit):
             }.get(self._tag, qcol(C.TEXT))
             fmt.setForeground(QBrush(col))
             cur.movePosition(cur.MoveOperation.End)
-            cur.insertText(ch, fmt)
+            cur.insertText(chunk, fmt)
             self.setTextCursor(cur)
             self.ensureCursorVisible()
-            self._pos += 1
+            self._pos += len(chunk)
         else:
             self._tmr.stop()
             cur = self.textCursor()

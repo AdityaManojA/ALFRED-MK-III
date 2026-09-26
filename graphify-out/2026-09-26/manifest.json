@@ -84,9 +84,9 @@
     "semantic_hash": ""
   },
   "actions/screen_processor.py": {
-    "mtime": 1790407619.4292567,
-    "seen": 1790407946.4525344,
-    "ast_hash": "8e161e97ad431171e406407d1795b295",
+    "mtime": 1790411348.583556,
+    "seen": 1790411382.4178839,
+    "ast_hash": "7afe89fc9ae2fe1c0fecc0a27fe1002a",
     "semantic_hash": ""
   },
   "actions/send_message.py": {
@@ -246,9 +246,9 @@
     "semantic_hash": "d9c6de0df2bf028d93924aff92487904"
   },
   "main.py": {
-    "mtime": 1790407436.0596576,
-    "seen": 1790407946.4525344,
-    "ast_hash": "fa469e0163e11bd4cd88da06f43120b2",
+    "mtime": 1790411133.3222253,
+    "seen": 1790411382.4188833,
+    "ast_hash": "d9f4b12e5dc371848d28e98a9da3fa62",
     "semantic_hash": ""
   },
   "memory/__init__.py": {
@@ -450,9 +450,9 @@
     "semantic_hash": ""
   },
   "config/music_playlist.json": {
-    "mtime": 1790403918.2649634,
-    "seen": 1790407946.4525344,
-    "ast_hash": "b2d47aa94081eb9c342c8c492d92e17e",
+    "mtime": 1790411245.1804624,
+    "seen": 1790411382.4178839,
+    "ast_hash": "c07e0692aa8020997063ec00cb4b6699",
     "semantic_hash": ""
   },
   "core/path_guard.py": {
@@ -543,6 +543,12 @@
     "mtime": 1790410252.5091007,
     "seen": 1790410451.179723,
     "ast_hash": "0a39d08cb28a90b2f61fba8db0d1262b",
+    "semantic_hash": ""
+  },
+  "tests/test_screen_processor.py": {
+    "mtime": 1790411147.571305,
+    "seen": 1790411382.4188833,
+    "ast_hash": "26286537283ef7d42de11f988f6cf724",
     "semantic_hash": ""
   }
 }
