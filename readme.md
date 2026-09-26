@@ -259,7 +259,33 @@ Directly streaming full screenshots to cloud APIs for coordinate lookup introduc
 
 ---
 
-## 🛠️ 12. Bug Fixes & Stability Updates
+## 🛡️ 12. Active Process Watchdog, Anomaly Detection & Auto-Throttling (`actions/system_monitor.py`)
+
+ALFRED incorporates an OS security and performance watchdog daemon that actively monitors running process trees, flags resource anomalies, inspects outbound network sockets, and executes automated resource throttling:
+
+* **Active Process Tree Monitoring (`watch_process_tree`)**: Continuously monitors the host process hierarchy via `psutil`. Automatically identifies single non-system processes sustaining **>90% CPU utilization for >10 consecutive seconds**.
+* **High-Visibility Alert Telemetry**: Real-time anomaly detection emits standard red-tag operational telemetry to the HUD and system logs:
+  ```text
+  [monitor] Resource anomaly: Process <PID:Name> utilizing <X>% CPU
+  ```
+* **Suspicious Socket Inspection (`track_suspicious_sockets`)**: Tracks active outbound TCP/UDP network connections querying non-standard remote ports. Filters out RFC private subnets, loopback addresses, and standard service ports (HTTP, HTTPS, SSH, DNS, NTP, etc.), alerting on unexpected remote network egress:
+  ```text
+  [monitor] Suspicious socket: Process <PID:Name> -> <Remote_IP>:<Port>
+  ```
+* **Automated Resource Throttling & Suspension (`throttle_process`)**:
+  * Automatically lowers target process priority class to `psutil.BELOW_NORMAL_PRIORITY_CLASS` (or nice value 10 on Unix) to prevent system freezing and prioritize interactive tasks.
+  * Supports pausing runaway workloads via `process.suspend()`, and restoring normal execution using `resume_process()`.
+* **System & IDE Shielding Constraints**:
+  * **Core System Binaries Protected**: `csrss.exe`, `explorer.exe`, `lsass.exe`, `services.exe`, `systemd`, `launchd`, and essential OS services are strictly exempted from throttling.
+  * **Developer Compilers Protected**: `code.exe`, `cl.exe`, `gcc.exe`, `g++.exe`, `rustc.exe`, `python.exe`, `py.exe` are never throttled during intensive builds or test suites.
+  * **ALFRED Hierarchy Protected**: ALFRED's own process (`os.getpid()`) and all child/worker sub-processes are permanently shielded.
+* **Confirmation-Gated Termination Gate (`terminate_process`)**:
+  * **Strict Safety Mandate**: To prevent accidental data loss or desktop disruption, processes are **never terminated automatically**.
+  * Any termination request is intercepted and dispatched through ALFRED's cryptographic **Single-Click UI Confirmation Gate** (`core/confirm.py`) with an on-screen HUD prompt requiring explicit approval.
+
+---
+
+## 🛠️ 13. Bug Fixes & Stability Updates
 
 * **Windows Modern Audio Endpoint Compatibility**: Fixed volume control in `actions/computer_settings.py` to interface with modern `pycaw.EndpointVolume` scalar setters, resolving attribute errors and eliminating PyAutoGUI mouse failsafe triggers.
 * **Path Guard Word Filtering**: Refined `core/path_guard.py` to prevent false-positive path resolution on plain single-word tool parameters (such as `"Save"` or `"File"`).
@@ -267,7 +293,7 @@ Directly streaming full screenshots to cloud APIs for coordinate lookup introduc
 
 ---
 
-## 🗺️ 13. System Architecture & File Structure
+## 🗺️ 14. System Architecture & File Structure
 
 ```
 ALFRED-MK-II/
@@ -307,7 +333,7 @@ ALFRED-MK-II/
 │   ├── proactive.py            # Context-aware proactive check-in engine
 │   ├── background_monitor.py   # Daily background topic watcher and headline alerts
 │   ├── reminder.py             # OS-native task scheduler notifications
-│   ├── system_monitor.py       # Live CPU, GPU, RAM, temperature telemetry
+│   ├── system_monitor.py       # Process tree watchdog, anomaly alerts, throttling & socket inspection
 │   ├── dev_agent.py            # Autonomous code developer agent with O(1) file matching
 │   ├── code_helper.py          # Code analysis, debugging, and generation
 │   ├── send_message.py         # WhatsApp and Telegram message dispatcher
@@ -341,6 +367,7 @@ ALFRED-MK-II/
 ├── tests/                      # Unit, integration & benchmark test suites
 │   ├── test_protocol_engine.py # Protocol engine & playbook execution tests
 │   ├── test_screen_find.py     # Local hybrid grounding & sub-150ms latency tests
+│   ├── test_system_monitor.py  # Process tree anomaly, throttling & socket inspection tests
 │   ├── test_audio_ducker.py    # Process-level audio ducking tests
 │   ├── test_background_worker.py# Background worker non-blocking concurrency tests
 │   ├── test_concurrency.py     # Bounded worker scaling tests
@@ -352,7 +379,7 @@ ALFRED-MK-II/
 
 ---
 
-## ⚡ 14. Quick Start & Installation
+## ⚡ 15. Quick Start & Installation
 
 ### 1. Prerequisites
 * **Operating System**: Windows 10/11, macOS, or Linux.
@@ -378,7 +405,7 @@ python main.py
 
 ---
 
-## 🔧 15. Configuration Reference (`config/api_keys.json`)
+## 🔧 16. Configuration Reference (`config/api_keys.json`)
 
 ```json
 {
@@ -405,7 +432,7 @@ python main.py
 
 ---
 
-## 📊 16. Knowledge Graph (`graphify`)
+## 📊 17. Knowledge Graph (`graphify`)
 
 This codebase is indexed with a persistent **GraphRAG Knowledge Graph** located in `graphify-out/`:
 * **2,150 nodes** & **4,223 relationships** mapped across 123 semantic functional communities.
@@ -414,7 +441,7 @@ This codebase is indexed with a persistent **GraphRAG Knowledge Graph** located 
 
 ---
 
-## 👤 17. Author & Credits
+## 👤 18. Author & Credits
 
 * **Lead Architect & Creator:** **ADITYA MANOJ**
 * **Original Creator & Core Inspiration:** **[FatihMakes](https://github.com/FatihMakes)** — creator of [Mark-LIV](https://github.com/FatihMakes/Mark-LIV)
