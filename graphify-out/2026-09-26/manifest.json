@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "ui.py": {
-    "mtime": 1790409970.450388,
-    "seen": 1790410033.2603912,
-    "ast_hash": "338709a527ce5532d5dc328f36442e90",
+    "mtime": 1790410607.940538,
+    "seen": 1790410759.4798055,
+    "ast_hash": "cf014518fa264486048fe7889d30741d",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "readme.md": {
-    "mtime": 1790408871.5572827,
-    "seen": 1790408941.2578824,
-    "ast_hash": "232e6e151e6f3fbe03dcb1a762c3c797",
+    "mtime": 1790410632.684509,
+    "seen": 1790410759.4798055,
+    "ast_hash": "eb471be531fad331d5c0560ba14469ae",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -419,24 +419,6 @@
     "ast_hash": "6db7a42e3ca9f6eaa14b7b184ff85b40",
     "semantic_hash": ""
   },
-  "scratch/export_cowl_obj.py": {
-    "mtime": 1790315366.7445235,
-    "seen": 1790315500.153664,
-    "ast_hash": "db9c64c7cfcbef5786b0451103a222bb",
-    "semantic_hash": ""
-  },
-  "scratch/generate_alfred_icons.py": {
-    "mtime": 1790315277.9941297,
-    "seen": 1790315500.153664,
-    "ast_hash": "85551600dbed682c7c98bed9233354a1",
-    "semantic_hash": ""
-  },
-  "scratch/test_cowl_mesh.py": {
-    "mtime": 1790315347.8956068,
-    "seen": 1790315500.153664,
-    "ast_hash": "11822895f314626a60db7d6989b7e2c6",
-    "semantic_hash": ""
-  },
   "config/alfred.png": {
     "mtime": 1790315289.0065298,
     "seen": 1790315500.153664,
@@ -453,12 +435,6 @@
     "mtime": 1790315289.0539944,
     "seen": 1790315500.153664,
     "ast_hash": "4e18de5b79fc804bbe903725d59132b8",
-    "semantic_hash": ""
-  },
-  "config/intel_notes.json": {
-    "mtime": 1790315929.497055,
-    "seen": 1790317352.0753677,
-    "ast_hash": "2f14ab70829d6a93f4aeb336a216d756",
     "semantic_hash": ""
   },
   "actions/update_app_icon.py": {
@@ -483,12 +459,6 @@
     "mtime": 1790410245.1522162,
     "seen": 1790410451.179723,
     "ast_hash": "e92e84ae7a845ee1d658861a7fad6735",
-    "semantic_hash": ""
-  },
-  "scratch/sync.ps1": {
-    "mtime": 1790407853.6530266,
-    "seen": 1790407946.4525344,
-    "ast_hash": "ffcbdb6b79585f6cefdc27df0be6fb70",
     "semantic_hash": ""
   },
   "Icons/Trasparent.png": {
@@ -525,18 +495,6 @@
     "mtime": 1790340470.3858564,
     "seen": 1790407946.453546,
     "ast_hash": "2b3995f5fc03a6b074de13e2037e6901",
-    "semantic_hash": ""
-  },
-  "scratch/find_loops.ps1": {
-    "mtime": 1790408423.76318,
-    "seen": 1790408663.442555,
-    "ast_hash": "6701905fa0e82f7dd737f6e45bd99095",
-    "semantic_hash": ""
-  },
-  "scratch/sync_bench.ps1": {
-    "mtime": 1790408608.2786934,
-    "seen": 1790408663.442555,
-    "ast_hash": "a8bfa7819ebaeb162b9fdc062cb35839",
     "semantic_hash": ""
   },
   "tests/__init__.py": {

@@ -1263,15 +1263,19 @@ class JarvisLive:
                     user_text = args.get("text", "What do you see?")
                     if angle == "camera":
                         img_b, mime_t = await loop.run_in_executor(None, _capture_camera)
+                        win_ctx = ""
                         self.ui.start_camera_stream()
                         self._vision_cam_active = True
                         _tlog("Vision", "camera", f"Camera: {len(img_b):,} bytes", self._dashboard)
                         _stall = "camera"
                     else:
-                        img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
+                        cap_res = await loop.run_in_executor(None, _capture_screen)
+                        img_b = cap_res[0]
+                        mime_t = cap_res[1]
+                        win_ctx = cap_res[2] if len(cap_res) > 2 else getattr(cap_res, "window_context", "")
                         _tlog("Vision", "screen", f"Screen: {len(img_b):,} bytes", self._dashboard)
                         _stall = "screen"
-                    self._pending_vision = (img_b, mime_t, user_text, angle)
+                    self._pending_vision = (img_b, mime_t, user_text, angle, win_ctx)
                     # The image is attached to this same exchange, so there is
                     # nothing to stall for and nothing to announce. Asking for an
                     # acknowledgement here is what produced two spoken answers —
@@ -1548,7 +1552,11 @@ class JarvisLive:
             return False
 
         import base64 as _b64
-        img_b, mime_t, question, angle = self._pending_vision
+        if len(self._pending_vision) >= 5:
+            img_b, mime_t, question, angle, win_ctx = self._pending_vision
+        else:
+            img_b, mime_t, question, angle = self._pending_vision
+            win_ctx = ""
         self._pending_vision = None
         b64 = _b64.b64encode(img_b).decode("ascii")
         _tlog("Vision", "out", f"{len(img_b):,} bytes (angle={angle}) → main session", self._dashboard)
@@ -1559,10 +1567,11 @@ class JarvisLive:
         # label *means* is explained once, in the generated [SELF] block.
         src = ("[IMAGE SOURCE: WEBCAM]" if angle == "camera"
                else "[IMAGE SOURCE: SCREEN CAPTURE]")
+        text_payload = f"{win_ctx}\n\n{src}\n\n{question}".strip() if win_ctx else f"{src}\n\n{question}"
         await self.session.send_client_content(
             turns={"role": "user", "parts": [
                 {"inline_data": {"mime_type": mime_t, "data": b64}},
-                {"text": f"{src}\n\n{question}"},
+                {"text": text_payload},
             ]},
             turn_complete=True,
         )
