@@ -19,7 +19,7 @@ else:
     _WIN_HIDE: dict = {}
 
 from PyQt6.QtCore import (
-    QEasingCurve, QLineF, QMimeData, QObject, QParallelAnimationGroup, QPointF,
+    QEasingCurve, QLineF, QMimeData, QObject, QParallelAnimationGroup, QPoint, QPointF,
     QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (

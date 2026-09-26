@@ -66,10 +66,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sys
 import time
 import threading
 from pathlib import Path
+
+# Silence noisy automatic function calling (AFC) library recommendation warnings
+logging.getLogger("google.genai").setLevel(logging.ERROR)
+logging.getLogger("google_genai").setLevel(logging.ERROR)
 
 if getattr(sys, "frozen", False):
     _BASE = Path(sys.executable).parent
@@ -114,12 +119,12 @@ SEARCH = "search"  # grounded search — REST only, see below
 LIVE = "live"
 
 _LADDERS = {
-    FAST: (LIVE, "gemini-2.5-flash-lite", "gemini-2.5-flash"),
-    SMART: (LIVE, "gemini-2.5-flash", "gemini-2.5-flash-lite"),
+    FAST: (LIVE, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"),
+    SMART: (LIVE, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-latest"),
     # Grounded search needs response.candidates[...].grounding_metadata, which a
     # Live turn does not produce. REST only, and it says so rather than silently
     # returning an answer with no sources behind it.
-    SEARCH: ("gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"),
+    SEARCH: ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"),
 }
 
 # The Live model to use for one-shot calls. main.py owns the real one; this is
@@ -405,6 +410,10 @@ def call(contents, tier: str = FAST, config=None,
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                 _cool(model)
                 print(f"[Gemini] {model}: out of quota — skipping it for "
+                      f"{_COOLDOWN_SECONDS // 60} minutes")
+            elif "404" in msg or "no longer available" in msg:
+                _cool(model)
+                print(f"[Gemini] {model}: unavailable/deprecated — skipping for "
                       f"{_COOLDOWN_SECONDS // 60} minutes")
             else:
                 print(f"[Gemini] {model}: {type(e).__name__}: {msg[:140]}")
