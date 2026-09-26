@@ -325,8 +325,12 @@ def _render_prompt(template: str, values: dict) -> str:
 
 
 def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+    try:
+        with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+            d = json.load(f)
+            return d.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY", "")
+    except Exception:
+        return os.environ.get("GEMINI_API_KEY", "")
 
 
 def _load_system_prompt() -> str:
@@ -611,9 +615,11 @@ class JarvisLive:
         self.ui             = ui
         self._asst_name     = "ALFRED"   # updated each session from config
         self.session              = None
+        self._is_local_mode       = False
+        self._local_msg_queue     = None
         self.audio_in_queue       = None
         self.out_queue            = None
-        self._loop                     = None
+        self._loop                = None
         self._is_speaking         = False
         self._speaking_lock       = threading.Lock()
         self._phone_active        = False   # True while phone mic is streaming; pauses PC mic
@@ -915,7 +921,7 @@ class JarvisLive:
         return url, key, f"{url}/auto-login?key={key}", manual
 
     def _on_text_command(self, text: str):
-        if not self._loop or not self.session:
+        if not self._loop:
             return
         # Respect wake-word sleep: a typed command must not be answered while
         # asleep either (the sleep gate is not just for the mic). Wake first with
@@ -923,13 +929,20 @@ class JarvisLive:
         if self._wake_enabled and not self._awake:
             self.ui.write_log("SYS: I'm asleep — say 'Hey Jarvis' or tap WAKE NOW first.")
             return
-        asyncio.run_coroutine_threadsafe(
-            self.session.send_client_content(
-                turns={"role": "user", "parts": [{"text": text}]},
-                turn_complete=True
-            ),
-            self._loop
-        )
+
+        if self.session:
+            asyncio.run_coroutine_threadsafe(
+                self.session.send_client_content(
+                    turns={"role": "user", "parts": [{"text": text}]},
+                    turn_complete=True
+                ),
+                self._loop
+            )
+        elif self._local_msg_queue is not None:
+            asyncio.run_coroutine_threadsafe(
+                self._local_msg_queue.put(text),
+                self._loop
+            )
 
     def _on_gui_clear_chat(self):
         """Called when user clicks the CLEAR button in desktop GUI."""
@@ -1236,7 +1249,7 @@ class JarvisLive:
         self.ui.write_log(f"ERR: {tool_name} — {short}")
         self.speak(f"Sir, {tool_name} encountered an error. {short}")
 
-    def _build_config(self) -> types.LiveConnectConfig:
+    def _build_system_instruction(self) -> tuple[str, list]:
         from datetime import datetime
 
         # Load customization from config
@@ -1261,9 +1274,6 @@ class JarvisLive:
         )
 
         # Identity injection — overrides any hardcoded name in prompt.txt
-        # Address form is a property of the language being spoken, so it is
-        # stated as a principle rather than a two-language lookup — the model
-        # already knows the respectful register of whatever language it is in.
         _addr = (f"ADDRESS: Always call the user '{_user_name}'."
                  if _user_name
                  else 'ADDRESS: Address the user with the ordinary respectful form '
@@ -1279,11 +1289,6 @@ class JarvisLive:
             f"{_addr}\n\n"
         )
 
-        # Everything the model is told about *itself* is derived here, not
-        # written into prompt.txt: the name comes from config, the platform from
-        # the host, the capability list from the registries that were just
-        # discovered. Rename the assistant, add a plugin or move to another OS
-        # and this follows without anyone editing a prompt.
         _all_decls = (TOOL_DECLARATIONS
                       + self._action_registry.get_tool_declarations()
                       + self._plugin_registry.get_tool_declarations())
@@ -1319,11 +1324,16 @@ class JarvisLive:
             parts.append(mem_str)
         parts.append(sys_prompt)
 
+        return "\n".join(parts), _all_decls
+
+    def _build_config(self) -> types.LiveConnectConfig:
+        system_instruction, _all_decls = self._build_system_instruction()
+
         cfg = dict(
             response_modalities=["AUDIO"],
             output_audio_transcription={},
             input_audio_transcription={},
-            system_instruction="\n".join(parts),
+            system_instruction=system_instruction,
             tools=[{"function_declarations": _all_decls}],
             # Hand back the handle captured from the last session_resumption
             # update. `handle=None` is exactly the old behaviour (ask for
@@ -1412,34 +1422,20 @@ class JarvisLive:
 
         return out
 
-    async def _execute_tool(self, fc) -> types.FunctionResponse:
-        name = fc.name
-        args = dict(fc.args or {})
-
+    async def _dispatch_tool(self, name: str, args: dict) -> str:
         _tlog("ALFRED", "control", f"{name}  {args}", self._dashboard)
         self.ui.set_state("THINKING")
 
         # Heavenly Restriction guard
         if _is_heavenly_restricted(args):
             _tlog("ALFRED", "warn", f"Blocked attempt to access restricted path D:\\Projects\\Personal-Assistant: {name}", self._dashboard)
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"result": "Due to the heavenly restriction placed upon my creator, I cannot."}
-            )
+            return "Due to the heavenly restriction placed upon my creator, I cannot."
 
         # Drive & Path Restriction guard (C: Desktop/Documents only; D: safe except source; E: safe)
         _path_ok, _path_err = _guard_check_action_params(name, args)
         if not _path_ok:
             _tlog("ALFRED", "warn", f"Blocked unauthorized path access ({name}): {_path_err}", self._dashboard)
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"result": _path_err}
-            )
-
+            return _path_err
 
         if name == "save_memory":
             category = args.get("category", "notes")
@@ -1448,25 +1444,13 @@ class JarvisLive:
             if key and value:
                 update_memory({category: {key: {"value": value}}})
                 _tlog("Memory", "save", f"save_memory: {category}/{key} = {value}", self._dashboard)
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"result": "ok", "silent": True}
-            )
+            return "ok"
 
         if name == "queue_background_task":
             task_type = str(args.get("task_type", "task")).strip()
             payload = str(args.get("payload", "")).strip()
             res = await self.queue_background_task(task_type, payload)
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={
-                    "result": f"Background task '{task_type}' queued successfully with ID {res['task_id']}. Execution proceeds non-blocking."
-                }
-            )
+            return f"Background task '{task_type}' queued successfully with ID {res['task_id']}. Execution proceeds non-blocking."
 
         loop   = asyncio.get_event_loop()
         result = "Done."
@@ -1605,9 +1589,6 @@ class JarvisLive:
             traceback.print_exc()
             self.speak_error(name, e)
 
-        if not self.ui.muted:
-            self.ui.set_state("LISTENING")
-
         _tlog("ALFRED", "out", f"{name} → {str(result)[:80]}", self._dashboard)
 
         # Notify dashboard / phone if a screenshot was produced
@@ -1627,12 +1608,26 @@ class JarvisLive:
             except Exception:
                 pass
 
-        # A tool that declared itself NON_BLOCKING also says when its answer may
-        # re-enter the conversation. Without this the model finishes whatever it
-        # was saying and then reads the result out on top of it — which, for
-        # something like a phone call already ringing, is exactly the noise the
-        # non-blocking call was meant to avoid. Tools that declared nothing get
-        # the API default and behave as they always have.
+        return str(result)
+
+    async def _execute_tool(self, fc) -> types.FunctionResponse:
+        name = fc.name
+        args = dict(fc.args or {})
+
+        if name == "save_memory":
+            res = await self._dispatch_tool(name, args)
+            if not self.ui.muted:
+                self.ui.set_state("LISTENING")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": res, "silent": True}
+            )
+
+        result = await self._dispatch_tool(name, args)
+
+        if not self.ui.muted:
+            self.ui.set_state("LISTENING")
+
         _sched = (self._action_registry.scheduling(name)
                   or self._plugin_registry.scheduling(name))
         _extra = {"scheduling": _sched} if _sched else {}
@@ -2423,35 +2418,232 @@ class JarvisLive:
                     # has no desktop WAKE button — so it wakes JARVIS if asleep.
                     if self._wake_enabled and not self._awake:
                         self.wake(reason="remote command")
-                    await self.session.send_client_content(
-                        turns={"role": "user", "parts": [{"text": text}]},
-                        turn_complete=True,
-                    )
-                    self.ui.write_log(f"[Web]: {text}")
-                    if self._dashboard:
-                        asyncio.create_task(self._dashboard.broadcast({
-                            "type": "log", "speaker": "user",
-                            "text": text,
-                            "ts": datetime.now().isoformat(),
-                        }))
-                else:
-                    print(f"[Dashboard] Dropped command (no session): {text}")
+                    if self.session:
+                        await self.session.send_client_content(
+                            turns={"role": "user", "parts": [{"text": text}]},
+                            turn_complete=True,
+                        )
+                        self.ui.write_log(f"[Web]: {text}")
+                        if self._dashboard:
+                            asyncio.create_task(self._dashboard.broadcast({
+                                "type": "log", "speaker": "user",
+                                "text": text,
+                                "ts": datetime.now().isoformat(),
+                            }))
+                    elif self._is_local_mode and self._local_msg_queue is not None:
+                        await self._local_msg_queue.put(text)
+                        self.ui.write_log(f"[Web]: {text}")
+                        if self._dashboard:
+                            asyncio.create_task(self._dashboard.broadcast({
+                                "type": "log", "speaker": "user",
+                                "text": text,
+                                "ts": datetime.now().isoformat(),
+                            }))
+                    else:
+                        print(f"[Dashboard] Dropped command (no session): {text}")
             except asyncio.TimeoutError:
                 pass
             except Exception as e:
                 print(f"[Dashboard] Command error: {e}")
                 await asyncio.sleep(0.5)
 
+    def _speak_local(self, text: str):
+        if not text or not text.strip() or self.ui.muted:
+            return
+        def _tts():
+            try:
+                import win32com.client
+                voice = win32com.client.Dispatch("SAPI.SpVoice")
+                clean = re.sub(r'[*_`#~]', '', text).strip()
+                if clean:
+                    voice.Speak(clean)
+            except Exception:
+                pass
+        threading.Thread(target=_tts, daemon=True).start()
+
+    async def run_local(self, provider: str = "ollama"):
+        from core.llm_client import (
+            call_llm_stream, call_llm_text, ensure_ollama_running,
+            get_llm_settings, warmup_model
+        )
+        url, model = get_llm_settings()
+        _tlog("ALFRED", "link", f"Local mode [{provider.upper()}] with model '{model}' at {url}", self._dashboard)
+        self.ui.write_log(f"SYS: Initialising local intelligence ({provider.upper()} // {model})...")
+        self.ui.set_state("THINKING")
+
+        if provider == "ollama":
+            ok = await asyncio.to_thread(ensure_ollama_running)
+            if not ok:
+                self.ui.write_log("WRN: Ollama server unreachable. Ensure 'ollama serve' is running.")
+            else:
+                self.ui.write_log(f"SYS: Ollama server connected at {url}.")
+        else:
+            self.ui.write_log(f"SYS: Local endpoint: {url} (model: {model}).")
+
+        self.ui.set_state("LISTENING")
+        self.ui.write_log("SYS: ALFRED online in LOCAL mode. Ready for directives.")
+
+        # Build tools declarations in OpenAI/Ollama compatible format
+        system_instruction, _all_decls = self._build_system_instruction()
+        local_tools = []
+        for d in _all_decls:
+            if not isinstance(d, dict) or not d.get("name"):
+                continue
+            name = d["name"]
+            desc = d.get("description", "")
+            params = d.get("parameters", {})
+            props = {}
+            for k, p in params.get("properties", {}).items():
+                props[k] = {
+                    "type": str(p.get("type", "string")).lower(),
+                    "description": p.get("description", "")
+                }
+            local_tools.append({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": desc,
+                    "parameters": {
+                        "type": "object",
+                        "properties": props,
+                        "required": params.get("required", [])
+                    }
+                }
+            })
+
+        history: list[dict] = [{"role": "system", "content": system_instruction}]
+
+        # Warm up prefix cache off-thread
+        asyncio.to_thread(warmup_model, system_instruction)
+
+        # Background system monitor tasks
+        asyncio.create_task(self._run_system_monitor())
+        asyncio.create_task(self._run_background_monitor())
+
+        while True:
+            try:
+                user_text = await self._local_msg_queue.get()
+                if not user_text or not user_text.strip():
+                    continue
+
+                user_text = user_text.strip()
+                self.ui.write_log(f"You: {user_text}")
+                self.ui.set_state("THINKING")
+                history.append({"role": "user", "content": user_text})
+
+                import queue
+                chunk_q = queue.Queue()
+
+                def _stream_worker(hist, tools, q):
+                    try:
+                        for chunk in call_llm_stream(hist, tools=tools):
+                            q.put(chunk)
+                    except Exception as err:
+                        q.put({"type": "error", "error": str(err)})
+
+                t = threading.Thread(
+                    target=_stream_worker,
+                    args=(history, local_tools, chunk_q),
+                    daemon=True
+                )
+                t.start()
+
+                accumulated = []
+                final_tool_calls = []
+                full_reply = ""
+
+                while True:
+                    await asyncio.sleep(0.02)
+                    drained_done = False
+                    while not chunk_q.empty():
+                        msg = chunk_q.get_nowait()
+                        mtype = msg.get("type")
+                        if mtype == "sentence":
+                            stext = msg.get("text", "").strip()
+                            if stext:
+                                accumulated.append(stext)
+                                self.ui.set_state("SPEAKING")
+                                self.ui.write_log(f"ALFRED: {stext}")
+                                if not self.ui.muted:
+                                    self._speak_local(stext)
+                        elif mtype == "done":
+                            full_reply = msg.get("content", "")
+                            final_tool_calls = msg.get("tool_calls", [])
+                            drained_done = True
+                            break
+                        elif mtype == "error":
+                            err_msg = msg.get("error", "Error")
+                            self.ui.write_log(f"ERR: Local model error: {err_msg}")
+                            drained_done = True
+                            break
+
+                    if drained_done:
+                        break
+                    if not t.is_alive() and chunk_q.empty():
+                        break
+
+                if full_reply and not accumulated:
+                    self.ui.write_log(f"ALFRED: {full_reply}")
+                    if not self.ui.muted:
+                        self._speak_local(full_reply)
+
+                if full_reply:
+                    history.append({"role": "assistant", "content": full_reply})
+
+                # Execute any tool calls requested by local model
+                if final_tool_calls:
+                    for tc in final_tool_calls:
+                        fn = tc.get("function", {})
+                        fn_name = fn.get("name", "")
+                        fn_args = fn.get("arguments", {})
+                        if isinstance(fn_args, str):
+                            try:
+                                fn_args = json.loads(fn_args)
+                            except Exception:
+                                fn_args = {}
+
+                        self.ui.set_state("THINKING")
+                        self.ui.write_log(f"SYS: Executing tool [{fn_name}]...")
+                        tool_out = await self._dispatch_tool(fn_name, fn_args)
+                        self.ui.write_log(f"SYS: Result: {str(tool_out)[:120]}")
+
+                        # Ask model for final answer incorporating tool result
+                        history.append({
+                            "role": "user",
+                            "content": f"[TOOL RESULT for {fn_name}]:\n{tool_out}\nBriefly answer the user with this information."
+                        })
+                        try:
+                            synth = await asyncio.to_thread(
+                                call_llm_text,
+                                prompt=f"Tool {fn_name} returned:\n{tool_out}\nProvide a concise and helpful response to the user.",
+                                system=system_instruction
+                            )
+                            if synth:
+                                self.ui.set_state("SPEAKING")
+                                self.ui.write_log(f"ALFRED: {synth}")
+                                if not self.ui.muted:
+                                    self._speak_local(synth)
+                                history.append({"role": "assistant", "content": synth})
+                        except Exception as e:
+                            _tlog("ALFRED", "warn", f"Synthesis error: {e}", self._dashboard)
+
+                self.ui.set_state("LISTENING")
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.ui.write_log(f"ERR: {e}")
+                self.ui.set_state("LISTENING")
+                await asyncio.sleep(0.5)
+
     # ── main loop ───────────────────────────────────────────────────────────
 
     async def run(self):
         self._loop = asyncio.get_event_loop()
+        self._local_msg_queue = asyncio.Queue()
         self._reconnect_event = asyncio.Event()
 
         # ── Wire the shared core services to the interface ───────────────────
-        # The confirmation gate is useless without a way to ask, and a memory
-        # trim is invisible without a way to say so. Both are bound once here
-        # rather than passed down through every action signature.
         confirm_gate.bind(
             show = self.ui.show_confirm,
             hide = self.ui.hide_confirm,
@@ -2459,31 +2651,36 @@ class JarvisLive:
         )
         set_trim_notifier(self.ui.write_log)
 
-        # Tell the device picker the exact rates the streams open at, from the
-        # constants that actually open them — so it can never list a device that
-        # cannot be opened at them.
         audio_devices.configure(SEND_SAMPLE_RATE, RECEIVE_SAMPLE_RATE)
-
-        # Enumerate audio devices off-thread. The settings drawer must never pay
-        # for host-API enumeration on the Qt thread.
         audio_devices.prefetch()
 
-        # Start dashboard (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
+        # Start dashboard (optional)
         try:
             from dashboard.server import DashboardServer
             self._dashboard = DashboardServer()
             self._dashboard.set_connect_callback(self._on_phone_connected)
             self._dashboard.set_clear_chat_callback(self._on_remote_clear_chat)
             asyncio.create_task(self._dashboard.serve())
-            # Runs for the whole lifetime, not just inside an active session
             asyncio.create_task(self._process_dashboard_commands())
         except Exception as e:
             print(f"[Dashboard] Disabled: {e}")
             self._dashboard = None
 
-        # Background worker runs for the whole lifetime of the app
         if self._bg_worker_task is None or self._bg_worker_task.done():
             self._bg_worker_task = asyncio.create_task(self._background_worker())
+
+        # Check provider: Gemini Live vs Local Model (Ollama / LM Studio)
+        provider = "gemini"
+        try:
+            cfg = json.loads(open(API_CONFIG_PATH, "r", encoding="utf-8").read())
+            provider = str(cfg.get("llm_provider", "gemini")).strip().lower()
+        except Exception:
+            pass
+
+        if provider in ("ollama", "openai", "lmstudio", "local"):
+            self._is_local_mode = True
+            await self.run_local(provider)
+            return
 
         while True:
             try:
@@ -2634,11 +2831,21 @@ class JarvisLive:
 
                 # Invalid API key — stop hammering the API, prompt re-configuration
                 if "API key not valid" in err_str or "1007" in err_str:
-                    self.ui.write_log("ERR: API key invalid — please re-enter your key.")
+                    self.ui.write_log("ERR: API key invalid — please re-enter your key or choose local mode.")
                     self.ui.set_state("SLEEPING")
                     self.ui.prompt_reconfig()
                     while not self.ui._win._ready:
                         await asyncio.sleep(1)
+                    # Check if user switched to a local offline backend (Ollama / LM Studio)
+                    try:
+                        cfg = json.loads(open(API_CONFIG_PATH, "r", encoding="utf-8").read())
+                        new_prov = str(cfg.get("llm_provider", "gemini")).strip().lower()
+                        if new_prov in ("ollama", "openai", "lmstudio", "local"):
+                            self._is_local_mode = True
+                            await self.run_local(new_prov)
+                            return
+                    except Exception:
+                        pass
                     _tlog("ALFRED", "link", "New API key saved — reconnecting...", self._dashboard)
                     _conn_backoff = 3
                     continue

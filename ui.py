@@ -3584,15 +3584,15 @@ class _CameraPreview(QWidget):
 
 
 class SetupOverlay(QWidget):
-    done = pyqtSignal(str, str)
+    done = pyqtSignal(object)  # emits config dict
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             SetupOverlay {{
-                background: rgba(4, 15, 26, 0.96);
-                border: 1px solid rgba(0, 240, 255, 0.25);
+                background: rgba(4, 15, 26, 0.98);
+                border: 1px solid rgba(0, 240, 255, 0.35);
                 border-radius: 16px;
             }}
         """)
@@ -3602,9 +3602,14 @@ class SetupOverlay(QWidget):
         )
         self._sel_os = detected
 
+        cur_cfg = _read_full_config()
+        self._provider = cur_cfg.get("llm_provider", "gemini").lower()
+        if self._provider not in ("gemini", "ollama", "openai"):
+            self._provider = "gemini"
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 28, 32, 28)
-        layout.setSpacing(10)
+        layout.setContentsMargins(28, 20, 28, 20)
+        layout.setSpacing(8)
 
         def _lbl(txt, font_size=9, bold=False, color=C.PRI,
                  align=Qt.AlignmentFlag.AlignCenter):
@@ -3616,65 +3621,226 @@ class SetupOverlay(QWidget):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        layout.addWidget(_lbl("◈  SYSTEM INITIALISATION", 13, True))
-        layout.addWidget(_lbl("Configure neural interface and credentials before first boot.", 9, color=C.PRI_DIM))
-        layout.addSpacing(6)
+        layout.addWidget(_lbl("◈  SYSTEM INITIALISATION", 12, True))
+        layout.addWidget(_lbl("Configure neural interface backend and credentials before first boot.", 8, color=C.PRI_DIM))
+        layout.addSpacing(4)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("color: rgba(0, 240, 255, 0.15);"); layout.addWidget(sep)
+        layout.addSpacing(2)
+
+        # ── Backend Mode Selector ───────────────────────────────────────
+        layout.addWidget(_lbl("INTELLIGENCE BACKEND // DUAL-OPERATION MODE", 8, bold=True, color=C.TEXT_DIM,
+                               align=Qt.AlignmentFlag.AlignLeft))
+        mode_row = QHBoxLayout(); mode_row.setSpacing(6)
+        self._mode_btns: dict[str, QPushButton] = {}
+        for m_key, m_label in [
+            ("gemini", "◈  GEMINI LIVE"),
+            ("ollama", "🦙  LOCAL OLLAMA"),
+            ("openai", "⚡  LM STUDIO / API"),
+        ]:
+            b = QPushButton(m_label)
+            b.setFont(tech_font(8, QFont.Weight.Bold, 30))
+            b.setFixedHeight(30)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(lambda _, k=m_key: self._set_backend(k))
+            self._mode_btns[m_key] = b
+            mode_row.addWidget(b)
+        layout.addLayout(mode_row)
         layout.addSpacing(4)
 
-        layout.addWidget(_lbl("GEMINI API DIRECTIVE KEY", 8, bold=True, color=C.TEXT_DIM,
-                               align=Qt.AlignmentFlag.AlignLeft))
-        self._key_input = QLineEdit()
+        # ── Provider Stack ──────────────────────────────────────────────
+        self._provider_stack = QStackedWidget()
+
+        # 1. Gemini Stack Page
+        gemini_w = QWidget(); gemini_lay = QVBoxLayout(gemini_w)
+        gemini_lay.setContentsMargins(0, 0, 0, 0); gemini_lay.setSpacing(4)
+        gemini_lay.addWidget(_lbl("GEMINI API DIRECTIVE KEY", 8, bold=True, color=C.TEXT_DIM,
+                                  align=Qt.AlignmentFlag.AlignLeft))
+        self._key_input = QLineEdit(cur_cfg.get("gemini_api_key", ""))
         self._key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._key_input.setPlaceholderText("AIza…")
-        self._key_input.setFont(mono_font(10))
-        self._key_input.setFixedHeight(34)
+        self._key_input.setPlaceholderText("AIzaSy... (free key from Google AI Studio)")
+        self._key_input.setFont(mono_font(9))
+        self._key_input.setFixedHeight(32)
         self._key_input.setStyleSheet(f"""
             QLineEdit {{
                 background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
-                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 9px; padding: 4px 12px;
+                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 8px; padding: 4px 10px;
             }}
             QLineEdit:focus {{ border: 1px solid {C.PRI}; background: rgba(0, 240, 255, 0.08); }}
         """)
-        layout.addWidget(self._key_input)
-        layout.addSpacing(10)
+        gemini_lay.addWidget(self._key_input)
+        gemini_hint = QLabel("Sub-second bidirectional voice stream via Google AI Studio WebSocket.")
+        gemini_hint.setFont(tech_font(7))
+        gemini_hint.setStyleSheet(f"color: {C.TEXT_MUTED}; background: transparent;")
+        gemini_lay.addWidget(gemini_hint)
+        gemini_lay.addStretch()
+        self._provider_stack.addWidget(gemini_w)
+
+        # 2. Ollama Stack Page
+        ollama_w = QWidget(); ollama_lay = QVBoxLayout(ollama_w)
+        ollama_lay.setContentsMargins(0, 0, 0, 0); ollama_lay.setSpacing(4)
+        
+        ollama_url_row = QHBoxLayout(); ollama_url_row.setSpacing(6)
+        ollama_url_box = QVBoxLayout(); ollama_url_box.setSpacing(2)
+        ollama_url_box.addWidget(_lbl("OLLAMA HOST URL", 7, bold=True, color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        self._ollama_url = QLineEdit(cur_cfg.get("llm_url", "http://localhost:11434"))
+        self._ollama_url.setFont(mono_font(9))
+        self._ollama_url.setFixedHeight(28)
+        self._ollama_url.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
+                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """)
+        ollama_url_box.addWidget(self._ollama_url)
+        ollama_url_row.addLayout(ollama_url_box, stretch=2)
+
+        ollama_model_box = QVBoxLayout(); ollama_model_box.setSpacing(2)
+        ollama_model_box.addWidget(_lbl("MODEL TAG", 7, bold=True, color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        self._ollama_model = QLineEdit(cur_cfg.get("llm_model", "llama3.2"))
+        self._ollama_model.setFont(mono_font(9))
+        self._ollama_model.setFixedHeight(28)
+        self._ollama_model.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
+                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """)
+        ollama_model_box.addWidget(self._ollama_model)
+        ollama_url_row.addLayout(ollama_model_box, stretch=2)
+        ollama_lay.addLayout(ollama_url_row)
+
+        chip_row = QHBoxLayout(); chip_row.setSpacing(4)
+        for chip_name in ["llama3.2", "qwen2.5:7b", "deepseek-coder-v2"]:
+            cb = QPushButton(chip_name)
+            cb.setFixedHeight(20)
+            cb.setFont(mono_font(7, letter_spacing=0.2))
+            cb.setCursor(Qt.CursorShape.PointingHandCursor)
+            cb.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(255, 255, 255, 0.04); color: {C.TEXT_MED};
+                    border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 3px; padding: 0 6px;
+                }}
+                QPushButton:hover {{ border-color: {C.PRI}; color: #ffffff; background: rgba(0, 240, 255, 0.10); }}
+            """)
+            cb.clicked.connect(lambda _, m=chip_name: self._ollama_model.setText(m))
+            chip_row.addWidget(cb)
+        chip_row.addStretch()
+        ollama_lay.addLayout(chip_row)
+
+        probe_row = QHBoxLayout(); probe_row.setSpacing(8)
+        self._probe_btn = QPushButton("◈  PROBE STATUS")
+        self._probe_btn.setFixedHeight(24)
+        self._probe_btn.setFont(tech_font(7, QFont.Weight.Bold))
+        self._probe_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._probe_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(0, 240, 255, 0.08); color: {C.PRI};
+                border: 1px solid {C.PRI}; border-radius: 4px; padding: 0 8px;
+            }}
+            QPushButton:hover {{ background: rgba(0, 240, 255, 0.20); color: #ffffff; }}
+        """)
+        self._probe_btn.clicked.connect(self._probe_ollama)
+        probe_row.addWidget(self._probe_btn)
+
+        self._probe_status = QLabel("100% offline, zero network egress")
+        self._probe_status.setFont(tech_font(7))
+        self._probe_status.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        probe_row.addWidget(self._probe_status, stretch=1)
+        ollama_lay.addLayout(probe_row)
+        ollama_lay.addStretch()
+        self._provider_stack.addWidget(ollama_w)
+
+        # 3. LM Studio Stack Page
+        lm_w = QWidget(); lm_lay = QVBoxLayout(lm_w)
+        lm_lay.setContentsMargins(0, 0, 0, 0); lm_lay.setSpacing(4)
+        lm_url_row = QHBoxLayout(); lm_url_row.setSpacing(6)
+        lm_url_box = QVBoxLayout(); lm_url_box.setSpacing(2)
+        lm_url_box.addWidget(_lbl("SERVER ENDPOINT", 7, bold=True, color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        self._lm_url = QLineEdit(cur_cfg.get("llm_url", "http://localhost:1234/v1"))
+        self._lm_url.setFont(mono_font(9))
+        self._lm_url.setFixedHeight(28)
+        self._lm_url.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
+                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """)
+        lm_url_box.addWidget(self._lm_url)
+        lm_url_row.addLayout(lm_url_box, stretch=2)
+
+        lm_model_box = QVBoxLayout(); lm_model_box.setSpacing(2)
+        lm_model_box.addWidget(_lbl("MODEL IDENTIFIER", 7, bold=True, color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        self._lm_model = QLineEdit(cur_cfg.get("llm_model", "local-model"))
+        self._lm_model.setFont(mono_font(9))
+        self._lm_model.setFixedHeight(28)
+        self._lm_model.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
+                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """)
+        lm_model_box.addWidget(self._lm_model)
+        lm_url_row.addLayout(lm_model_box, stretch=2)
+        lm_lay.addLayout(lm_url_row)
+        lm_hint = QLabel("Compatible with LM Studio, Jan, LocalAI, vLLM, and llama.cpp server.")
+        lm_hint.setFont(tech_font(7))
+        lm_hint.setStyleSheet(f"color: {C.TEXT_MUTED}; background: transparent;")
+        lm_lay.addWidget(lm_hint)
+        lm_lay.addStretch()
+        self._provider_stack.addWidget(lm_w)
+
+        layout.addWidget(self._provider_stack)
+        layout.addSpacing(4)
 
         sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet("color: rgba(0, 240, 255, 0.15);"); layout.addWidget(sep2)
-        layout.addSpacing(4)
+        layout.addSpacing(2)
 
         layout.addWidget(_lbl("TARGET OPERATING SYSTEM", 8, bold=True, color=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
         det_name = {"windows": "Windows", "mac": "macOS", "linux": "Linux"}[detected]
-        layout.addWidget(_lbl(f"Auto-detected Environment: {det_name}", 8, color=C.ACC2,
+        layout.addWidget(_lbl(f"Auto-detected Environment: {det_name}", 7, color=C.ACC2,
                                align=Qt.AlignmentFlag.AlignLeft))
 
-        os_row = QHBoxLayout(); os_row.setSpacing(8)
+        os_row = QHBoxLayout(); os_row.setSpacing(6)
         self._os_btns: dict[str, QPushButton] = {}
         for key, label in [("windows","⊞  Windows"),("mac","◈  macOS"),("linux","🐧  Linux")]:
             btn = QPushButton(label)
-            btn.setFont(tech_font(9, QFont.Weight.Bold, 40))
-            btn.setFixedHeight(32)
+            btn.setFont(tech_font(8, QFont.Weight.Bold, 30))
+            btn.setFixedHeight(28)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.clicked.connect(lambda _, k=key: self._sel(k))
+            btn.clicked.connect(lambda _, k=key: self._sel_os_btn(k))
             os_row.addWidget(btn)
             self._os_btns[key] = btn
         layout.addLayout(os_row)
-        self._sel(detected)
-        layout.addSpacing(12)
+        self._sel_os_btn(detected)
+        self._set_backend(self._provider)
+        layout.addSpacing(6)
+
+        # Validation error banner
+        self._err_lbl = QLabel("")
+        self._err_lbl.setFont(tech_font(7, QFont.Weight.Bold))
+        self._err_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+        self._err_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._err_lbl.hide()
+        layout.addWidget(self._err_lbl)
 
         init_btn = QPushButton("▸  INITIALISE SYSTEMS")
-        init_btn.setFont(tech_font(10, QFont.Weight.Bold, 60))
-        init_btn.setFixedHeight(38)
+        init_btn.setFont(tech_font(9, QFont.Weight.Bold, 50))
+        init_btn.setFixedHeight(36)
         init_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         init_btn.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0,240,255,0.35), stop:1 rgba(0,180,255,0.18));
                 color: #ffffff;
                 border: 1px solid {C.PRI};
-                border-radius: 10px;
+                border-radius: 8px;
             }}
             QPushButton:hover {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0,240,255,0.55), stop:1 rgba(0,210,255,0.30));
@@ -3688,7 +3854,28 @@ class SetupOverlay(QWidget):
         init_btn.clicked.connect(self._submit)
         layout.addWidget(init_btn)
 
-    def _sel(self, key: str):
+    def _set_backend(self, key: str):
+        self._provider = key
+        idx_map = {"gemini": 0, "ollama": 1, "openai": 2}
+        self._provider_stack.setCurrentIndex(idx_map.get(key, 0))
+        for k, btn in self._mode_btns.items():
+            if k == key:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {C.PRI}; color: {C.DARK};
+                        border: none; border-radius: 6px; font-weight: bold;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: rgba(255, 255, 255, 0.04); color: {C.TEXT_DIM};
+                        border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 6px;
+                    }}
+                    QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.PRI}; background: rgba(0, 240, 255, 0.08); }}
+                """)
+
+    def _sel_os_btn(self, key: str):
         self._sel_os = key
         pal = {"windows":(C.PRI,"#001a22"),"mac":(C.ACC2,"#1a1400"),"linux":(C.GREEN,"#001a0d")}
         for k, btn in self._os_btns.items():
@@ -3697,27 +3884,91 @@ class SetupOverlay(QWidget):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: {fg}; color: {bg};
-                        border: none; border-radius: 8px; font-weight: bold;
+                        border: none; border-radius: 6px; font-weight: bold;
                     }}
                 """)
             else:
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: rgba(255, 255, 255, 0.04); color: {C.TEXT_DIM};
-                        border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 8px;
+                        border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 6px;
                     }}
                     QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.PRI}; background: rgba(0, 240, 255, 0.08); }}
                 """)
 
+    def _probe_ollama(self):
+        self._probe_status.setText("Probing Ollama...")
+        self._probe_status.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
+        url = self._ollama_url.text().strip() or "http://localhost:11434"
+
+        def _check():
+            import urllib.request
+            try:
+                req = urllib.request.Request(f"{url.rstrip('/')}/api/tags", headers={"User-Agent": "ALFRED"})
+                with urllib.request.urlopen(req, timeout=2.0) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        models = [m.get("name", "") for m in data.get("models", [])]
+                        return True, models
+            except Exception:
+                pass
+            return False, []
+
+        def _on_done(ok, models):
+            if ok:
+                found_str = ", ".join(models[:3]) if models else "server reachable"
+                self._probe_status.setText(f"● ONLINE // Models: {found_str}")
+                self._probe_status.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            else:
+                self._probe_status.setText("▲ OFFLINE — Run 'ollama serve' in terminal")
+                self._probe_status.setStyleSheet(f"color: {C.RED}; background: transparent;")
+
+        threading.Thread(target=lambda: _on_done(*_check()), daemon=True).start()
+
     def _submit(self):
-        key = self._key_input.text().strip()
-        if not key:
-            self._key_input.setStyleSheet(
-                self._key_input.styleSheet() +
-                f" QLineEdit {{ border: 1px solid {C.RED}; }}"
-            )
-            return
-        self.done.emit(key, self._sel_os)
+        self._err_lbl.hide()
+        prov = self._provider
+        os_name = self._sel_os
+
+        if prov == "gemini":
+            key = self._key_input.text().strip()
+            if not key:
+                self._key_input.setStyleSheet(
+                    self._key_input.styleSheet() +
+                    f" QLineEdit {{ border: 1px solid {C.RED}; }}"
+                )
+                self._err_lbl.setText("GEMINI KEY REQUIRED FOR CLOUD. OR SELECT LOCAL OLLAMA.")
+                self._err_lbl.show()
+                return
+            config_dict = {
+                "llm_provider": "gemini",
+                "gemini_api_key": key,
+                "os_system": os_name,
+            }
+        elif prov == "ollama":
+            url = self._ollama_url.text().strip() or "http://localhost:11434"
+            model = self._ollama_model.text().strip() or "llama3.2"
+            key = self._key_input.text().strip()
+            config_dict = {
+                "llm_provider": "ollama",
+                "llm_url": url,
+                "llm_model": model,
+                "gemini_api_key": key,
+                "os_system": os_name,
+            }
+        else:  # openai / lmstudio
+            url = self._lm_url.text().strip() or "http://localhost:1234/v1"
+            model = self._lm_model.text().strip() or "local-model"
+            key = self._key_input.text().strip()
+            config_dict = {
+                "llm_provider": "openai",
+                "llm_url": url,
+                "llm_model": model,
+                "gemini_api_key": key,
+                "os_system": os_name,
+            }
+
+        self.done.emit(config_dict)
 
 
 class HueWheel(QWidget):
@@ -8396,35 +8647,36 @@ class MainWindow(QMainWindow):
 
     def _check_config(self) -> bool:
         if not API_FILE.exists():
-            env_key = os.environ.get("GEMINI_API_KEY")
-            if env_key:
-                try:
-                    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-                    detected_os = "windows" if sys.platform.startswith("win") else ("mac" if sys.platform == "darwin" else "linux")
-                    API_FILE.write_text(json.dumps({"gemini_api_key": env_key, "os_system": detected_os}, indent=4), encoding="utf-8")
-                    return True
-                except Exception:
-                    pass
             return False
         try:
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            key = d.get("gemini_api_key") or d.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-            if not key:
+            if not isinstance(d, dict):
                 return False
-            if not d.get("os_system"):
-                d["os_system"] = "windows" if sys.platform.startswith("win") else ("mac" if sys.platform == "darwin" else "linux")
-                try:
-                    API_FILE.write_text(json.dumps(d, indent=4), encoding="utf-8")
-                except Exception:
-                    pass
-            return True
+            # If user has not explicitly chosen an intelligence backend yet,
+            # always present the SetupOverlay so they can choose Local (Ollama) vs Gemini.
+            if "llm_provider" not in d:
+                return False
+
+            provider = str(d.get("llm_provider", "")).strip().lower()
+            if provider in ("ollama", "openai", "lmstudio", "local"):
+                # Local offline model configured — Gemini API key is NOT required
+                return True
+
+            if provider == "gemini":
+                key = d.get("gemini_api_key") or d.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+                if not key:
+                    return False
+                return True
+
+            return False
         except Exception:
             return False
 
     def _show_setup(self):
         ov = SetupOverlay(self.centralWidget())
         cw = self.centralWidget()
-        ow, oh = 460, 390
+        ow = min(540, cw.width() - 40)
+        oh = min(460, cw.height() - 40)
         ov.setGeometry(
             (cw.width()  - ow) // 2,
             (cw.height() - oh) // 2,
@@ -8434,10 +8686,27 @@ class MainWindow(QMainWindow):
         ov.show()
         self._overlay = ov
 
-    def _on_setup_done(self, key: str, os_name: str):
+    def _on_setup_done(self, config_data, os_name=None):
         os.makedirs(CONFIG_DIR, exist_ok=True)
+        current = {}
+        if API_FILE.exists():
+            try:
+                current = json.loads(API_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                current = {}
+
+        if isinstance(config_data, dict):
+            current.update(config_data)
+            os_name = current.get("os_system", "windows")
+            prov = current.get("llm_provider", "gemini")
+        else:
+            current["gemini_api_key"] = str(config_data)
+            if os_name:
+                current["os_system"] = os_name
+            prov = current.get("llm_provider", "gemini")
+
         API_FILE.write_text(
-            json.dumps({"gemini_api_key": key, "os_system": os_name}, indent=4),
+            json.dumps(current, indent=4),
             encoding="utf-8",
         )
         self._ready = True
@@ -8446,7 +8715,7 @@ class MainWindow(QMainWindow):
             self._overlay = None
         self._apply_state("LISTENING")
         self._assistant_name = _read_full_config().get("assistant_name", "Alfred") or "Alfred"
-        self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. {self._assistant_name} online.")
+        self._log.append_log(f"SYS: Initialised. Mode: {prov.upper()}. OS: {str(os_name).upper()}. {self._assistant_name} online.")
 
 
 class _RootShim:

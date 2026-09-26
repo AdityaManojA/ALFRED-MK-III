@@ -184,6 +184,14 @@ def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,
         if path.name.startswith("_"):
             continue
         try:
+            # Fast check: skip helper files that do not declare a module-level TOOL
+            try:
+                code_sample = path.read_text(encoding="utf-8", errors="ignore")
+                if "TOOL" not in code_sample:
+                    continue
+            except Exception:
+                pass
+
             module_name = f"actions.{path.stem}"
             # Reuse the already-imported module when present so handlers are the
             # same objects the rest of the app holds.

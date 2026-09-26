@@ -11,29 +11,12 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 import json
 
-# ChromaDB for vector storage
-try:
-    import chromadb
-    from chromadb.config import Settings
-except ImportError:
-    print("Warning: chromadb not installed. Install with: pip install chromadb")
-    chromadb = None
-
-# Sentence Transformers for embeddings
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    print("Warning: sentence-transformers not installed. Install with: pip install sentence-transformers")
-    SentenceTransformer = None
-
-# Watchdog for file system events
-try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-except ImportError:
-    print("Warning: watchdog not installed. Install with: pip install watchdog")
-    Observer = None
-    FileSystemEventHandler = None
+# Lazy-loaded dependencies to avoid heavy startup overhead (PyTorch, ChromaDB, Transformers)
+chromadb = None
+Settings = None
+SentenceTransformer = None
+Observer = None
+FileSystemEventHandler = None
 
 # Tokenizer for chunking (we'll use the sentence-transformers tokenizer)
 # We'll load the model and use its tokenizer
@@ -59,9 +42,12 @@ _observer = None
 
 def _init_chroma():
     """Initialize ChromaDB client and collection."""
-    global _chroma_client, _collection
+    global _chroma_client, _collection, chromadb
     if chromadb is None:
-        raise ImportError("chromadb is not installed. Please install chromadb.")
+        try:
+            import chromadb
+        except ImportError:
+            raise ImportError("chromadb is not installed. Please install with: pip install chromadb")
 
     # Ensure the directory exists
     Path(CHROMA_DB_PATH).mkdir(parents=True, exist_ok=True)
@@ -77,9 +63,12 @@ def _init_chroma():
 
 def _init_embedding_model():
     """Initialize the sentence-transformers embedding model."""
-    global _embedding_model
+    global _embedding_model, SentenceTransformer
     if SentenceTransformer is None:
-        raise ImportError("sentence-transformers is not installed. Please install sentence-transformers.")
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError("sentence-transformers is not installed. Please install with: pip install sentence-transformers")
 
     _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     return _embedding_model
@@ -329,10 +318,16 @@ def _delete_file_chunks(file_path: Path):
 
 def start_watchdog():
     """Start watching the Desktop and Documents directories for changes."""
-    global _observer
+    global _observer, Observer, FileSystemEventHandler
     if Observer is None:
-        print("Watchdog not installed. Skipping auto-update.")
-        return
+        try:
+            from watchdog.observers import Observer as _Obs
+            from watchdog.events import FileSystemEventHandler as _FSEH
+            Observer = _Obs
+            FileSystemEventHandler = _FSEH
+        except ImportError:
+            print("Watchdog not installed. Skipping auto-update.")
+            return
     _observer = Observer()
     handler = _ChangeHandler()
     allowed_roots = get_allowed_c_roots()

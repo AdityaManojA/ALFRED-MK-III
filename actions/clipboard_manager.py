@@ -35,12 +35,9 @@ except ImportError:
     pyperclip = None
     _PYPERCLIP_OK = False
 
-try:
-    from fastembed import TextEmbedding
-    _FASTEMBED_OK = True
-except ImportError:
-    TextEmbedding = None
-    _FASTEMBED_OK = False
+# Lazy-load fastembed inside _get_embedding_model to avoid startup delay
+TextEmbedding = None
+_FASTEMBED_OK = None
 
 _RED = "\033[91m"
 _RESET = "\033[0m"
@@ -180,12 +177,18 @@ class ClipboardManager:
 
     def _get_embedding_model(self) -> Any:
         """Lazily initialize local fastembed model."""
-        if self._embedding_model is None and _FASTEMBED_OK:
+        global _FASTEMBED_OK, TextEmbedding
+        if self._embedding_model is None and _FASTEMBED_OK is not False:
             try:
+                if TextEmbedding is None:
+                    from fastembed import TextEmbedding as _TE
+                    TextEmbedding = _TE
                 self._embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                _FASTEMBED_OK = True
             except Exception as e:
                 print(f"{_RED}[clipboard]{_RESET} FastEmbed init notice: {e}")
                 self._embedding_model = False
+                _FASTEMBED_OK = False
         return self._embedding_model if self._embedding_model is not False else None
 
     def _compute_embedding(self, text: str) -> Optional[List[float]]:

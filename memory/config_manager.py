@@ -48,7 +48,14 @@ def load_api_keys() -> dict:
 def get_gemini_key() -> str | None:
     return load_api_keys().get("gemini_api_key")
 
+def get_llm_provider() -> str:
+    return load_api_keys().get("llm_provider", "gemini").lower()
+
 def is_configured() -> bool:
+    cfg = load_api_keys()
+    provider = cfg.get("llm_provider", "gemini").lower()
+    if provider in ("ollama", "openai", "lmstudio", "local"):
+        return True
     key = get_gemini_key()
     return bool(key and len(key) > 15)
 
