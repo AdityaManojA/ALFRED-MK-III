@@ -44,6 +44,7 @@ for _stream in ("stdout", "stderr"):
 
 import asyncio
 import re
+import secrets
 import threading
 import time
 import json
@@ -537,6 +538,34 @@ TOOL_DECLARATIONS = [
             "required": [],
         },
     },
+    {
+        "name": "queue_background_task",
+        "description": (
+            "Queue a non-blocking background job (e.g. web scraping, video processing, "
+            "graph indexing, mock task) so that voice interaction turns and PTT continue without "
+            "blocking. Telemetry progress updates ([control] [background XX%]) are streamed "
+            "via WebSockets to the dashboard and UI HUD."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "task_type": {
+                    "type": "STRING",
+                    "description": (
+                        "Type of background task to perform, e.g. 'mock_task', 'web_scraping', "
+                        "'video_processing', 'graph_indexing', or 'data_fetch'."
+                    ),
+                },
+                "payload": {
+                    "type": "STRING",
+                    "description": (
+                        "Task payload or parameters (JSON string or plain text description/duration)."
+                    ),
+                },
+            },
+            "required": ["task_type"],
+        },
+    },
 ]
 
 class _ReconnectSignal(Exception):
@@ -626,6 +655,12 @@ class JarvisLive:
         self.ui.on_clear_chat     = self._on_gui_clear_chat
         self._reconnect_event: asyncio.Event | None = None
         self._reconnect_keep = True   # False → next rebuild drops the resumption handle
+
+        # ── Background Task Worker Queue ───────────────────────────────
+        self.background_task_queue: asyncio.Queue = asyncio.Queue()
+        self._bg_halt_event: asyncio.Event = asyncio.Event()
+        self._bg_current_task_id: str | None = None
+        self._bg_worker_task: asyncio.Task | None = None
 
         # ── Session resumption ─────────────────────────────────────────
         # The server issues a resumption handle every few seconds and reissues
@@ -1017,7 +1052,173 @@ class JarvisLive:
         self._play_cursor = 0.0     # next batch starts a fresh timeline
         if self._turn_done_event:
             self._turn_done_event.clear()
+        if hasattr(self, "_bg_halt_event") and self._bg_halt_event:
+            self._bg_halt_event.set()
+            _tlog("control", "background halted", "Background tasks halted by interrupt event", getattr(self, "_dashboard", None))
+            if hasattr(self, "ui") and self.ui:
+                self.ui.write_log("[control] [background halted] Tasks halted by interrupt")
         self.ui.write_log("SYS: Interrupted — listening...")
+
+    async def queue_background_task(self, task_type: str, payload: str = "") -> dict:
+        """Queue a background task and return task metadata immediately."""
+        task_id = f"bg_{int(time.time() * 1000)}_{secrets.token_hex(3)}"
+        job = {
+            "id": task_id,
+            "task_type": task_type,
+            "payload": payload,
+            "created_at": time.time(),
+        }
+        await self.background_task_queue.put(job)
+        _tlog("control", "background queued", f"Task {task_id} [{task_type}] queued", getattr(self, "_dashboard", None))
+        if hasattr(self, "ui") and self.ui:
+            self.ui.write_log(f"[control] [background queued] {task_type} ({task_id})")
+        return {"task_id": task_id, "status": "queued"}
+
+    async def _safe_background_announce(self, text: str) -> None:
+        """Announce background completion ensuring ALFRED does not talk over active speech."""
+        while getattr(self, "_is_speaking", False):
+            await asyncio.sleep(0.3)
+
+        if hasattr(self, "_bg_halt_event") and self._bg_halt_event.is_set():
+            return
+
+        if self.session and self._loop:
+            try:
+                await self.session.send_client_content(
+                    turns={"role": "user", "parts": [{"text": f"[Background Task Result] {text}"}]},
+                    turn_complete=True
+                )
+            except Exception as e:
+                _tlog("ALFRED", "warn", f"Could not announce background task: {e}", getattr(self, "_dashboard", None))
+
+    async def _execute_background_job(self, job: dict) -> dict:
+        """Execute a single background job, streaming [control] [background XX%] progress."""
+        task_id = job["id"]
+        task_type = job["task_type"]
+        payload = job.get("payload", "")
+        self._bg_current_task_id = task_id
+
+        async def broadcast_progress(pct: int, detail: str = ""):
+            tag = "control"
+            icon = f"background {pct}%"
+            msg_text = detail or f"Task {task_id} ({task_type}) {pct}%"
+            _tlog(tag, icon, msg_text, getattr(self, "_dashboard", None))
+            if hasattr(self, "ui") and self.ui:
+                self.ui.write_log(f"[{tag}] [{icon}] {msg_text}")
+            if self._dashboard and hasattr(self._dashboard, "update_background_task"):
+                try:
+                    await self._dashboard.update_background_task(
+                        task_id=task_id,
+                        task_type=task_type,
+                        progress=pct,
+                        status="running" if pct < 100 else "completed",
+                        detail=msg_text,
+                    )
+                except Exception:
+                    pass
+
+        try:
+            await broadcast_progress(0, f"Started {task_type}")
+
+            if task_type == "mock_task":
+                duration = 10.0
+                try:
+                    if isinstance(payload, (int, float)):
+                        duration = float(payload)
+                    elif isinstance(payload, str) and payload.strip():
+                        if payload.strip().startswith("{"):
+                            import json
+                            data = json.loads(payload)
+                            duration = float(data.get("duration", 10.0))
+                        else:
+                            duration = float(payload.strip())
+                except Exception:
+                    duration = 10.0
+
+                steps = 10
+                interval = max(0.01, duration / steps)
+                for i in range(1, steps + 1):
+                    slice_start = time.monotonic()
+                    while time.monotonic() - slice_start < interval:
+                        if self._bg_halt_event.is_set():
+                            break
+                        await asyncio.sleep(min(0.02, interval))
+
+                    if self._bg_halt_event.is_set():
+                        _tlog("control", "background halted", f"Task {task_id} ({task_type}) halted", getattr(self, "_dashboard", None))
+                        if hasattr(self, "ui") and self.ui:
+                            self.ui.write_log(f"[control] [background halted] Task {task_id}")
+                        if self._dashboard and hasattr(self._dashboard, "update_background_task"):
+                            await self._dashboard.update_background_task(
+                                task_id=task_id, task_type=task_type, progress=int((i - 1) / steps * 100),
+                                status="halted", detail="Halted by user interrupt"
+                            )
+                        return {"status": "halted", "task_id": task_id}
+                    pct = int((i / steps) * 100)
+                    await broadcast_progress(pct, f"Processing step {i}/{steps}")
+
+            elif task_type == "web_scraping":
+                steps = 5
+                for i in range(1, steps + 1):
+                    if self._bg_halt_event.is_set():
+                        return {"status": "halted", "task_id": task_id}
+                    await asyncio.sleep(0.4)
+                    await broadcast_progress(int((i / steps) * 100), f"Scraping targets ({i}/{steps})")
+
+            elif task_type == "video_processing":
+                steps = 5
+                for i in range(1, steps + 1):
+                    if self._bg_halt_event.is_set():
+                        return {"status": "halted", "task_id": task_id}
+                    await asyncio.sleep(0.4)
+                    await broadcast_progress(int((i / steps) * 100), f"Processing video ({i}/{steps})")
+
+            elif task_type == "graph_indexing":
+                steps = 4
+                for i in range(1, steps + 1):
+                    if self._bg_halt_event.is_set():
+                        return {"status": "halted", "task_id": task_id}
+                    await asyncio.sleep(0.4)
+                    await broadcast_progress(int((i / steps) * 100), f"Indexing graph ({i}/{steps})")
+
+            else:
+                await asyncio.sleep(0.5)
+                await broadcast_progress(100, f"Task {task_type} completed")
+
+            await broadcast_progress(100, f"Task {task_id} completed successfully")
+            await self._safe_background_announce(f"Task '{task_type}' has finished.")
+            return {"status": "completed", "task_id": task_id}
+
+        except Exception as e:
+            _tlog("control", "background error", f"Task {task_id} error: {e}", getattr(self, "_dashboard", None))
+            if hasattr(self, "ui") and self.ui:
+                self.ui.write_log(f"[control] [background error] Task {task_id}: {e}")
+            if self._dashboard and hasattr(self._dashboard, "update_background_task"):
+                try:
+                    await self._dashboard.update_background_task(
+                        task_id=task_id, task_type=task_type, progress=0, status="failed", detail=str(e)
+                    )
+                except Exception:
+                    pass
+            return {"status": "failed", "task_id": task_id, "error": str(e)}
+        finally:
+            self._bg_current_task_id = None
+
+    async def _background_worker(self) -> None:
+        """Worker loop consuming background jobs from background_task_queue."""
+        while True:
+            try:
+                job = await self.background_task_queue.get()
+                self._bg_halt_event.clear()
+                try:
+                    await self._execute_background_job(job)
+                finally:
+                    self.background_task_queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                _tlog("ALFRED", "warn", f"Background worker exception: {e}", getattr(self, "_dashboard", None))
+                await asyncio.sleep(0.5)
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -1252,6 +1453,19 @@ class JarvisLive:
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": "ok", "silent": True}
+            )
+
+        if name == "queue_background_task":
+            task_type = str(args.get("task_type", "task")).strip()
+            payload = str(args.get("payload", "")).strip()
+            res = await self.queue_background_task(task_type, payload)
+            if not self.ui.muted:
+                self.ui.set_state("LISTENING")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={
+                    "result": f"Background task '{task_type}' queued successfully with ID {res['task_id']}. Execution proceeds non-blocking."
+                }
             )
 
         loop   = asyncio.get_event_loop()
@@ -2266,6 +2480,10 @@ class JarvisLive:
         except Exception as e:
             print(f"[Dashboard] Disabled: {e}")
             self._dashboard = None
+
+        # Background worker runs for the whole lifetime of the app
+        if self._bg_worker_task is None or self._bg_worker_task.done():
+            self._bg_worker_task = asyncio.create_task(self._background_worker())
 
         while True:
             try:

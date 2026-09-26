@@ -472,6 +472,7 @@ class DashboardServer:
         self._pending_keys: dict[str, float] = {}
         self._device_sessions: dict[str, dict] = {}  # device_token → {session_key}
         self._phone_audio_queue: asyncio.Queue    = asyncio.Queue(maxsize=200)
+        self._background_tasks: dict[str, dict]   = {}
         self._uploads_dir                 = UPLOADS_DIR
         self._login_html                  = _read("login.html")
         self._app_html                    = _read("app.html")
@@ -526,12 +527,39 @@ class DashboardServer:
     def set_clear_chat_callback(self, fn) -> None:
         self._clear_chat_callback = fn
 
-    # ── broadcast ────────────────────────────────────────────────────────
+    # ── background tasks & broadcast ────────────────────────────────────
+
+    async def update_background_task(
+        self,
+        task_id: str,
+        task_type: str,
+        progress: int,
+        status: str,
+        detail: str = "",
+    ) -> None:
+        payload = {
+            "type": "background_task",
+            "task_id": task_id,
+            "task_type": task_type,
+            "progress": progress,
+            "status": status,
+            "detail": detail,
+            "updated_at": time.time(),
+        }
+        self._background_tasks[task_id] = payload
+        await self.broadcast(payload)
+
+    def get_background_tasks(self) -> dict:
+        return dict(self._background_tasks)
 
     async def broadcast(self, msg: dict) -> None:
         if msg.get("type") == "clear_chat":
             self._history.clear()
         else:
+            if msg.get("type") == "background_task":
+                tid = msg.get("task_id")
+                if tid:
+                    self._background_tasks[tid] = msg
             self._history.append(msg)
             if len(self._history) > 300:
                 self._history = self._history[-300:]
@@ -844,6 +872,10 @@ class DashboardServer:
             if not path.exists() or not path.is_file():
                 return JSONResponse({"error": "Not found"}, status_code=404)
             return FileResponse(str(path), filename=safe)
+
+        @app.get("/api/background_tasks")
+        async def background_tasks_ep(req: Request):
+            return JSONResponse({"ok": True, "tasks": list(self._background_tasks.values())})
 
         @app.websocket("/ws")
         async def ws_ep(websocket: WebSocket, token: str = ""):

@@ -162,10 +162,10 @@
     "semantic_hash": "9553de8377deb53c2e3e9b7910774688"
   },
   "core/echo.py": {
-    "mtime": 1790275670.906108,
-    "seen": 1790278410.9365003,
-    "ast_hash": "f4f424c4a165859a0e4f426427a64789",
-    "semantic_hash": "f4f424c4a165859a0e4f426427a64789"
+    "mtime": 1790424296.1922882,
+    "seen": 1790424421.5003722,
+    "ast_hash": "40d55b2da5fe6d469377043bc31c5fa5",
+    "semantic_hash": ""
   },
   "core/gemini.py": {
     "mtime": 1790412007.4748173,
@@ -246,9 +246,9 @@
     "semantic_hash": "d9c6de0df2bf028d93924aff92487904"
   },
   "main.py": {
-    "mtime": 1790424020.8205633,
-    "seen": 1790424106.013802,
-    "ast_hash": "3497875d9333e0a57a095c5b68547902",
+    "mtime": 1790424337.2223349,
+    "seen": 1790424421.5003722,
+    "ast_hash": "0628d99fc8b5cd2f537e9bdf53195ee1",
     "semantic_hash": ""
   },
   "memory/__init__.py": {
@@ -561,6 +561,18 @@
     "mtime": 1790424043.4462473,
     "seen": 1790424106.014804,
     "ast_hash": "b05bdc463bf8f7141b3a8bbb40b53482",
+    "semantic_hash": ""
+  },
+  "core/audio_ducker.py": {
+    "mtime": 1790424284.643693,
+    "seen": 1790424421.5003722,
+    "ast_hash": "1878c96f046b3f9a27b6c0b8f8dc1f4a",
+    "semantic_hash": ""
+  },
+  "tests/test_audio_ducker.py": {
+    "mtime": 1790424362.1570187,
+    "seen": 1790424421.5003722,
+    "ast_hash": "48f72273389a26a980dd4ab8dd8d1238",
     "semantic_hash": ""
   }
 }
