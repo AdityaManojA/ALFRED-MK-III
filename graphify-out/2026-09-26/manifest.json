@@ -36,9 +36,9 @@
     "semantic_hash": "ff19215cbe9791e883a8eb150acf6d62"
   },
   "actions/dev_agent.py": {
-    "mtime": 1790408575.4677603,
-    "seen": 1790408663.442555,
-    "ast_hash": "7b7f98d90ce6df2574cb5a6352495fcb",
+    "mtime": 1790410411.9742846,
+    "seen": 1790410451.179723,
+    "ast_hash": "3c5898fe95dea20fb7a22a986d1dca5c",
     "semantic_hash": ""
   },
   "actions/file_controller.py": {
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "core/path_guard.py": {
-    "mtime": 1790354252.705583,
-    "seen": 1790407946.4525344,
-    "ast_hash": "52391f2c351e5e5c45ed1b869aa9c018",
+    "mtime": 1790410245.1522162,
+    "seen": 1790410451.179723,
+    "ast_hash": "e92e84ae7a845ee1d658861a7fad6735",
     "semantic_hash": ""
   },
   "scratch/sync.ps1": {
@@ -579,6 +579,12 @@
     "mtime": 1790409517.1540158,
     "seen": 1790409616.3655908,
     "ast_hash": "f4b874c4a254f257c4b3aea4faedeb02",
+    "semantic_hash": ""
+  },
+  "tests/test_heal_error.py": {
+    "mtime": 1790410252.5091007,
+    "seen": 1790410451.179723,
+    "ast_hash": "0a39d08cb28a90b2f61fba8db0d1262b",
     "semantic_hash": ""
   }
 }
