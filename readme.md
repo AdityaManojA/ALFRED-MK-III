@@ -1,78 +1,136 @@
-# 🦇 ALFRED — MARK II (Wayne Protocol Edition)
+# 🦇 ALFRED — MARK III (Wayne Protocol Edition)
 ### Autonomous Multimodal AI Desktop Assistant & Tactical Terminal
 **Architect & Lead Creator:** **ADITYA MANOJ**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![AI Backend](https://img.shields.io/badge/AI-Gemini%203.5%20Flash%20Live%20%7C%20Local%20Ollama-8E75B2.svg?logo=google&logoColor=white)](https://ai.google.dev/)
+[![AI Backend](https://img.shields.io/badge/AI-Gemini%203.1%20Flash%20Live%20%7C%20Local%20Ollama-8E75B2.svg?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Local LLMs](https://img.shields.io/badge/Local%20LLM-Ollama%20%7C%20LM%20Studio%20%7C%20vLLM-orange.svg)](https://ollama.com)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6%20Software%20Renderer-41CD52.svg?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
-[![AES-256 Remote](https://img.shields.io/badge/Mobile-Quantum%20Dashboard%20(iOS%2FAndroid)-00f0ff.svg)](https://github.com/)
+[![AES-256 Remote](https://img.shields.io/badge/Mobile-Quantum%20Dashboard%20(iOS%2FAndroid)-00f0ff.svg)](https://github.com/AdityaManojA/ALFRED-MK-III)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-> **ALFRED MARK-II** is an autonomous, real-time voice, vision, and system-control executive assistant built for complete digital sovereignty and tactical computing. Featuring native bidirectional audio streaming, real-time visual grounding, full desktop automation, high-performance long-term memory, and encrypted mobile remote telemetry.
+> **ALFRED MARK-III** is an autonomous, real-time voice, vision, and system-control executive assistant built for complete digital sovereignty and tactical computing. Featuring native bidirectional audio streaming, real-time visual grounding, full desktop automation, high-performance long-term memory, and encrypted mobile remote telemetry.
 
 ---
 
-## 🖥️ 1. 100% Local & Air-Gapped Offline Execution
+## 🖥️ 1. 100% Local & Air-Gapped Offline Execution: Switching from Gemini to Local API
 
-**ALFRED can be run completely locally and offline by swapping from the Google Gemini Live API to local open-weight language models** (Ollama, LM Studio, vLLM, Jan, LocalAI, or llama.cpp).
+**ALFRED is architected for dual-backend operation**: you can seamlessly toggle between Google's high-speed **Gemini 3.1 Flash Live API** (cloud multimodal WebSocket) and **100% local, air-gapped open-weight models** (Ollama, LM Studio, vLLM, Jan, LocalAI, or llama.cpp) without changing a single line of application code.
 
-When running in local mode:
-* **Zero Network Calls**: Prompts, memory search, computer automation, and conversations never leave your local hardware.
-* **Local Offline Wake Word**: Employs `openwakeword` on the CPU with zero internet connectivity required.
-* **Software Avatar Rendering**: The 3D holographic head is computed purely through mathematical projection and `QPainter` on your CPU—no GPU drivers, CUDA, or external graphical runtimes required.
+### ⚖️ Gemini Live API vs. Local Offline API Comparison
 
-### 📋 Steps to Switch to a Local Model
+| Feature | Gemini 3.1 Flash Live | Local Open-Weight API (Ollama / vLLM / LM Studio) |
+|---|---|---|
+| **Audio Latency** | Sub-second native bidirectional WebSocket streaming | Local STT/TTS pipeline or text-streaming |
+| **Privacy & Security** | Encrypted TLS to Google Cloud | 100% offline, zero network egress, fully air-gapped |
+| **Hardware Requirements** | Zero local compute (runs on any CPU) | 8GB–24GB+ VRAM/RAM depending on quantized model size |
+| **API Token Cost** | Pay-per-token or free tier quotas | **$0.00 forever** (unlimited free local inference) |
+| **Tool / Function Calling** | Native Gemini Automatic Function Calling (AFC) | Tool-calling supported via JSON mode or prompt schema |
+| **Offline Operation** | Requires active Internet connection | **Operates entirely without internet connection** |
 
-#### Step 1: Install & Launch Your Local Model Provider
-Choose either **Ollama** (recommended) or any **OpenAI-compatible server** (LM Studio, vLLM, LocalAI):
+---
 
-* **Option A: Ollama** (Easiest)
-  1. Download and install [Ollama](https://ollama.com/).
-  2. Pull and start your preferred model in your terminal:
-     ```bash
-     ollama run llama3.2
-     # Or use Qwen, Mistral, DeepSeek, or Phi:
-     # ollama run qwen2.5:7b-instruct
-     ```
-  3. Ollama runs by default at `http://localhost:11434`.
+### 📋 Detailed Step-by-Step Guide: How to Switch to a Local API
 
-* **Option B: LM Studio / vLLM / LocalAI**
-  1. Download [LM Studio](https://lmstudio.ai/) or launch your `vLLM` server.
-  2. Load any function-calling model (e.g. `Qwen2.5-7B-Instruct`, `Llama-3.1-8B-Instruct`).
-  3. Start the local server at `http://localhost:1234` (or your chosen port).
+#### Step 1: Install & Set Up Your Preferred Local LLM Server
 
-#### Step 2: Configure ALFRED's Local Model Provider
-Open `config/api_keys.json` in your project folder and set the `llm_provider`, `llm_url`, and `llm_model`:
+Choose any of the following recommended local model engines:
 
-##### For Ollama:
+##### Option A: Ollama (Recommended — Simplest Setup)
+1. Download and run the installer for Windows, macOS, or Linux from [ollama.com](https://ollama.com/).
+2. Open PowerShell or Terminal and pull your model of choice:
+   ```powershell
+   # Recommended for 8GB VRAM / RAM (Fast & Accurate):
+   ollama pull llama3.2:3b-instruct-q4_K_M
+   # Or for 16GB VRAM / RAM (High reasoning capacity):
+   ollama pull qwen2.5:7b-instruct
+   # Or for deep programming & tool execution:
+   ollama pull deepseek-coder-v2:16b
+   ```
+3. Start the Ollama daemon (runs automatically in background at `http://localhost:11434` or verify with `ollama list`).
+
+##### Option B: LM Studio (Recommended for GUI Users)
+1. Download [LM Studio](https://lmstudio.ai/) and launch it.
+2. Search and download any quantized GGUF model with tool-calling capabilities (e.g., `Qwen2.5-7B-Instruct-GGUF` or `Llama-3.1-8B-Instruct-GGUF`).
+3. Click the **Local Server** tab (double-arrow icon `<->` on the left sidebar).
+4. Set the port to `1234` (default) and click **Start Server**.
+5. Your local OpenAI-compatible endpoint is now live at `http://localhost:1234/v1`.
+
+##### Option C: vLLM or llama.cpp (High-Throughput / Linux Servers)
+Run with your OpenAI-compatible API flag:
+```bash
+python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct --port 8000
+```
+
+---
+
+#### Step 2: Configure ALFRED's Target Backend in `config/api_keys.json`
+
+Open `config/api_keys.json` in the root folder of ALFRED. Set `llm_provider`, `llm_url`, and `llm_model`:
+
+##### Configuration Template for Ollama:
 ```json
 {
     "llm_provider": "ollama",
     "llm_url": "http://localhost:11434",
     "llm_model": "llama3.2",
     "assistant_name": "ALFRED",
-    "user_name": "Master Wayne"
+    "user_name": "Master Wayne",
+    "ui_color": "#e5a93b",
+    "voice_name": "Charon",
+    "wake_word_enabled": true,
+    "push_to_talk_enabled": true
 }
 ```
 
-##### For LM Studio / OpenAI-Compatible Server:
+##### Configuration Template for LM Studio / vLLM (OpenAI-Compatible):
 ```json
 {
     "llm_provider": "openai",
-    "llm_url": "http://localhost:1234",
+    "llm_url": "http://localhost:1234/v1",
     "llm_model": "qwen2.5-7b-instruct",
     "assistant_name": "ALFRED",
-    "user_name": "Master Wayne"
+    "user_name": "Master Wayne",
+    "ui_color": "#e5a93b",
+    "voice_name": "Charon",
+    "wake_word_enabled": true,
+    "push_to_talk_enabled": true
 }
 ```
 
-#### Step 3: Launch ALFRED
-Run the assistant normally:
-```bash
+---
+
+#### Step 3: Launch ALFRED & Verify Connection
+
+Start ALFRED in your terminal:
+```powershell
 python main.py
 ```
-ALFRED will automatically test connection to your local endpoint via `core/llm_client.py` and route all reasoning, system tool execution, and voice interactions through your local model. To switch back to Gemini Live at any time, simply supply your Gemini API key in `config/api_keys.json`.
+* **Connection Handshake**: `core/llm_client.py` will probe your local endpoint during startup:
+  ```text
+  [LLM] Connected to local Ollama server at http://localhost:11434 (model: llama3.2)
+  [Actions] Action discovery complete: 23 active.
+  ```
+* **Offline Wake Word**: When offline, ALFRED automatically utilizes `openwakeword` on your local CPU for zero-cloud keyword activation.
+* **CPU Avatar Graphics**: The 3D holographic wireframe head computes pure vector geometry via `QPainter` on your CPU—no CUDA or GPU required.
+
+---
+
+#### Step 4: How to Switch Back to Gemini Live API Anytime
+
+To return to Gemini Live, either:
+1. Re-add your `"gemini_api_key"` in `config/api_keys.json`:
+   ```json
+   {
+       "gemini_api_key": "AIzaSyYourActualKeyHere...",
+       "llm_provider": "gemini"
+   }
+   ```
+2. Or set the system environment variable:
+   ```powershell
+   $env:GEMINI_API_KEY="AIzaSyYourActualKeyHere..."
+   ```
+ALFRED will automatically prioritize the Gemini Live bidirectional WebSocket when a valid key is detected.
 
 ---
 
@@ -98,8 +156,8 @@ ALFRED is designed around uncompromising principles of system integrity, process
 
 | Subsystem | Architectural Implementation |
 |---|---|
-| ⚡ **Bidirectional Live Audio** | Native streaming via **Gemini 3.5 / 3.1 Flash Live** (or local Ollama/LM Studio streaming). Real-time natural speech with sub-second response latency. |
-| 🧑‍🎤 **Authentic Batcomputer Core** | Enforced default tactical centerpiece featuring a 3D vector globe, dynamic audio waveforms, and real-time hex matrix telemetry. |
+| ⚡ **Bidirectional Live Audio** | Native streaming via **Gemini 3.1 Flash Live** (or local Ollama/LM Studio streaming). Real-time natural speech with sub-second response latency. |
+| 🧑‍🎤 **Holographic 3D Avatar** | Pure software-rendered 3D head built on `QPainter` with zero GPU driver dependencies. Breathes, blinks, looks away while thinking, and glances at new events. |
 | 👄 **Formant & Viseme Lip-Sync** | ~50 mouth shapes/sec derived from real-time FFT audio formants (F1 openness, F2 spread/round) combined with Unicode articulatory decomposition across 20+ languages. |
 | 👁️ **Visual Multimodal Grounding** | On-demand single-frame capture of multi-monitor displays and webcams (`screen_processor.py`). Frame feeds are labelled by origin and injected into conversational context. |
 | 🎚️ **Global Push-to-Talk** | Hold `Ctrl+Space` to talk. Hardware mic remains completely shut off when idle. Polled at 30 Hz via Windows raw virtual key polling, window-scoped on macOS/Linux. |
@@ -145,30 +203,84 @@ ALFRED is designed around uncompromising principles of system integrity, process
 
 ---
 
-## 🛡️ 8. Decoupled Real-Time Insignia & Chassis Hot-Swapper
+## 🛡️ 8. Real-Time Insignia & Chassis Hot-Swapper
 
 * **Multi-Insignia Catalog**: Scans and registers brand assets from `Icons/` (Batman Beyond, Arkham Asylum, Classic Bat, White Bat, Tactical Stealth).
-* **Decoupled Emblem Architecture**: Updating the active insignia (*"update the app icon to Batman Beyond"*) cleanly isolates HUD branding from application icons.
-  * **Header Icon**: Updates `self._header_icon_lbl` right next to `┌ ALFRED // MARK II ┐`.
-  * **OS Windows & Taskbar**: Dynamically updates `setWindowIcon` and system taskbar application process icons in real time.
-  * **Batcomputer Watermark**: Permanently locks and preserves the center background Wayne Crest watermark (`config/batman_logo.png` / `config/alfred_bg.png`) without distortion.
+* **Live Runtime Reconfiguration (`update_app_icon.py`)**: Hot-swaps the active application window icon, Windows taskbar insignia, and system tray in real time upon voice request (*"update the app icon to Batman Beyond"*) or via the Customise Assistant drawer.
 * **Automatic Shortcut Synchronization**: Dynamically generates and updates `A.L.F.R.E.D.lnk` on the desktop without interrupting the running session.
 
 ---
 
-## 🗺️ 9. System Architecture & File Structure
+## ⚙️ 9. Protocol Engine & Multi-Step Macro Playbooks (`config/protocols.yaml`)
+
+ALFRED features an autonomous **Protocol Engine** (`actions/protocol_engine.py`) for executing complex, sequential, compound system workflows via simple custom voice triggers:
+
+* **Voice Trigger Activation**: Activate entire multi-app, multi-action workflows using custom trigger words collected during workflow setup.
+  * *Example: Saying **"FCC CLAUDE"** immediately opens PowerShell as Administrator, types and launches `fcc-server`, waits for initialization, opens a secondary terminal window, and executes `fcc-claude`.*
+* **Interactive Workflow Creation ("LETS CREATE A WORKFLOW")**:
+  * Users can state *"Let's create a workflow"* to formulate compound routines interactively.
+  * Employs ALFRED's cryptographic **Single-Click Confirmation Gate** (`core/confirm.py`) to display an on-screen HUD banner before committing new playbooks to `config/protocols.yaml`.
+* **Dynamic Variable Interpolation**: Steps support runtime substitution for `{timestamp}`, `{date}`, `{time}`, `{user}`, `{workspace}`, and custom voice arguments.
+* **Execution Delays & Pacing**: Fine-grained per-step timing control via `sleep_ms` (e.g. allowing server processes to bind ports before launching client terminals).
+* **Strict Defensive Path Guarding**: Every step argument is validated through `core.path_guard` prior to dispatch. If any step attempts to access unauthorized paths or fails execution, the engine **immediately aborts** all remaining steps and outputs:
+  ```text
+  [error] Protocol <Name> halted at Step <X>: <reason>
+  ```
+* **Red-Tag Operational Telemetry**: Emits high-visibility step telemetry during execution:
+  ```text
+  [control] Executing Protocol <Name> Step <X>/<Y>: <Tool_Name>
+  ```
+
+---
+
+## 👁️ 10. Local Hybrid Visual Grounding (RapidOCR + ONNX + Gemini Fallback)
+
+Directly streaming full screenshots to cloud APIs for coordinate lookup introduces network latency and high token consumption. ALFRED resolves this via a multi-tiered local hybrid element grounding pipeline (`actions/screen_find.py`):
+
+1. **Local RapidOCR Detection (<150ms)**: Scans screen captures locally using `rapidocr_onnxruntime`. Uses intelligent toolbar strip partitioning and early-termination recognition to identify target buttons and text labels in **~75–95ms** without network calls.
+2. **Quantized ONNX Vision Detector**: If the query is an icon or non-text glyph (e.g., search icon, close button, avatar), ALFRED runs a locally cached, quantized ONNX model (`omniparser_v2_quant.onnx` / `florence2_quant.onnx`) with zero cold-start latency.
+3. **Automatic Delegation Threshold**:
+   * **Confidence $\ge 0.80$**: Returns normalized `(x, y)` coordinates to `computer_control.py` immediately without calling external APIs.
+   * **Confidence $< 0.80$**: Automatically falls back to Gemini visual grounding and emits red-tag telemetry:
+     ```text
+     [screen] Local grounding confidence low (<score>) — delegating to Gemini
+     ```
+
+---
+
+## 🔊 11. Process-Level Audio Ducking & Background Concurrency
+
+* **Process-Level Media Ducking (`core/audio_ducker.py`)**: Interacts directly with OS audio session managers (`pycaw` on Windows, `pulsectl` on Linux) to automatically reduce background media processes (Spotify, Chrome, YouTube, VLC, Edge) by **70%** (factor `0.3`) whenever ALFRED speaks, restoring exact pre-duck volumes when speech completes or is interrupted (`[halt]`).
+* **Non-Blocking Background Worker Pool (`main.py`)**: Asynchronous worker queue (`background_task_queue`) executing long-running background tasks (web scraping, video processing, graph indexing) concurrently without blocking primary voice conversation turns, streaming live telemetry updates (`[control] [background XX%]`) to the HUD.
+* **Bounded Concurrency Limiter (`core/concurrency.py`)**: Asynchronous worker pools with controlled concurrency limits (default: 5 concurrent workers) preventing socket exhaustion, thread starvation, and rate limits.
+* **Centralized TTL & LRU Cache (`core/cache.py`)**: Thread-safe memory cache with deterministic argument hashing, prefix invalidation on mutations, and graceful fail-open resilience.
+
+---
+
+## 🛠️ 12. Bug Fixes & Stability Updates
+
+* **Windows Modern Audio Endpoint Compatibility**: Fixed volume control in `actions/computer_settings.py` to interface with modern `pycaw.EndpointVolume` scalar setters, resolving attribute errors and eliminating PyAutoGUI mouse failsafe triggers.
+* **Path Guard Word Filtering**: Refined `core/path_guard.py` to prevent false-positive path resolution on plain single-word tool parameters (such as `"Save"` or `"File"`).
+* **HUD Volume Popup Geometry**: Resolved `QPoint` namespace issue during volume popup positioning in `ui.py`.
+
+---
+
+## 🗺️ 13. System Architecture & File Structure
 
 ```
 ALFRED-MK-II/
 ├── main.py                     # Main execution loop, Live WebSocket/Local LLM router, audio streams, tool dispatcher
-├── ui.py                       # PyQt6 HUD interface, authentic Batcomputer tactical core, audio visualizer, drawer settings
+├── ui.py                       # PyQt6 HUD interface, holographic 3D avatar, audio visualizer, drawer settings
 ├── setup.py                    # OS-aware package and dependency installer
 ├── core/
 │   ├── prompt.txt              # Master persona directives, execution rules & Heavenly Restriction
-│   ├── gemini.py               # Optimized Gemini API wrapper with active fallback ladders & 404 endpoint cooldowns
 │   ├── llm_client.py           # Dual-backend local LLM connector (Ollama / OpenAI-compatible / LM Studio)
 │   ├── action_loader.py        # Dynamic action discovery, parameter validation & Heavenly Restriction guard
 │   ├── plugin_loader.py        # Drop-in plugin discovery, sandboxing & isolation
+│   ├── audio_ducker.py         # Process-level audio ducking for Spotify, Chrome, VLC (pycaw/pulsectl)
+│   ├── concurrency.py          # Bounded concurrent worker pool & rate-limiting semaphore
+│   ├── cache.py                # Centralized thread-safe TTL/LRU cache with prefix invalidation
+│   ├── heal_error.py           # Autonomous runtime error diagnosis and recovery
 │   ├── avatar.py               # Software QPainter head renderer, lighting & expression rig
 │   ├── avatar_mesh.py          # MediaPipe 3D canonical facial geometry builder
 │   ├── viseme.py               # Unicode articulatory transcription to mouth shapes
@@ -180,6 +292,8 @@ ALFRED-MK-II/
 │   ├── path_guard.py           # Path validation, C: drive quarantine, and Heavenly Restriction enforcement
 │   └── wake_word.py            # Local offline openwakeword detection thread
 ├── actions/                    # Self-describing operational tools (TOOL dictionary schema)
+│   ├── protocol_engine.py      # Macro playbook engine executing multi-step YAML workflows
+│   ├── screen_find.py          # Local hybrid RapidOCR + ONNX element grounding (<150ms)
 │   ├── computer_control.py     # OS automation, keyboard/mouse input, dual screenshots
 │   ├── screen_processor.py     # Multi-monitor screen & camera capture engine
 │   ├── file_controller.py      # File system operations with path restriction checks
@@ -202,6 +316,12 @@ ALFRED-MK-II/
 │   ├── flight_finder.py        # Commercial flight search and travel assistant
 │   ├── gmail_manager.py        # Local Gmail integration and inbox digest
 │   └── weather_report.py       # Localized live meteorological reports
+├── config/
+│   ├── protocols.yaml          # Macro playbook workflows, trigger words, and compound step definitions
+│   ├── api_keys.json           # User credentials, model settings, identity & voice preferences
+│   └── certs/                  # Local self-signed SSL/TLS certificates for HTTPS/WSS
+├── models/                     # Quantized local ONNX vision & element detection models
+│   └── omniparser_v2_quant.onnx# Quantized UI element detector for local grounding
 ├── plugins/                    # User drop-in plugin folder
 │   ├── _template.py            # Reference plugin template
 │   ├── calendar_sync.py        # Local agenda, appointments, and meeting scheduling
@@ -216,19 +336,21 @@ ALFRED-MK-II/
 │   ├── memory_manager.py       # High-performance O(N log N) memory persistence and indexing
 │   ├── config_manager.py       # Settings, voice, theme, and API key management
 │   └── long_term.json          # Local encrypted fact database
-├── config/
-│   ├── api_keys.json           # User credentials, model settings, identity & voice preferences
-│   └── certs/                  # Local self-signed SSL/TLS certificates for HTTPS/WSS
-├── tests/                      # Unit & performance test suites
+├── tests/                      # Unit, integration & benchmark test suites
+│   ├── test_protocol_engine.py # Protocol engine & playbook execution tests
+│   ├── test_screen_find.py     # Local hybrid grounding & sub-150ms latency tests
+│   ├── test_audio_ducker.py    # Process-level audio ducking tests
+│   ├── test_background_worker.py# Background worker non-blocking concurrency tests
+│   ├── test_concurrency.py     # Bounded worker scaling tests
+│   ├── test_cache.py           # TTL & LRU caching tests
+│   ├── test_heal_error.py      # Auto-healing error recovery tests
 │   └── benchmarks/             # 50,000-record execution benchmarks
-│       ├── test_memory_benchmark.py
-│       └── test_traceback_benchmark.py
 └── graphify-out/               # GraphRAG knowledge graph, community clusters, and analysis
 ```
 
 ---
 
-## ⚡ 10. Quick Start & Installation
+## ⚡ 14. Quick Start & Installation
 
 ### 1. Prerequisites
 * **Operating System**: Windows 10/11, macOS, or Linux.
@@ -254,7 +376,7 @@ python main.py
 
 ---
 
-## 🔧 11. Configuration Reference (`config/api_keys.json`)
+## 🔧 15. Configuration Reference (`config/api_keys.json`)
 
 ```json
 {
@@ -281,27 +403,16 @@ python main.py
 
 ---
 
-## 📊 12. Knowledge Graph (`graphify`)
+## 📊 16. Knowledge Graph (`graphify`)
 
 This codebase is indexed with a persistent **GraphRAG Knowledge Graph** located in `graphify-out/`:
-* **1,889 nodes** & **3,720 relationships** mapped across 108 semantic functional communities.
+* **2,150 nodes** & **4,223 relationships** mapped across 123 semantic functional communities.
 * Interactive navigable graph visualization: [`graphify-out/graph.html`](file:///d:/Projects/Personal-Assistant/Mark-LIV/graphify-out/graph.html).
 * Architectural breakdown: [`graphify-out/GRAPH_REPORT.md`](file:///d:/Projects/Personal-Assistant/Mark-LIV/graphify-out/GRAPH_REPORT.md).
 
 ---
 
-## 🛠️ 13. Bug Fixes & System Patches
-
-* **Volume Popup GUI Fix**: Resolved a `NameError: name 'QPoint' is not defined` crash when clicking the volume HUD control by importing `QPoint` directly from `PyQt6.QtCore`.
-* **Gemini API 404 & Deprecated Model Ladder Patch**:
-  * Updated `_LADDERS` in `core/gemini.py` to route through active production endpoints (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-flash-latest`, `gemini-flash-lite-latest`) following Google's retirement of preview identifiers.
-  * Added dynamic 5-minute endpoint cooldowns when encountering `404 NOT_FOUND` responses to prevent repetitive failing calls.
-* **Automatic Function Calling (AFC) SDK Noise Suppression**: Silenced verbose Google GenAI SDK stderr recommendation warnings during one-shot execution calls by setting logger levels for `google.genai` and `google_genai` to `logging.ERROR`.
-* **HUD Streamlining & Emblem Decoupling**: Streamlined the tactical drawer controls by locking the HUD centerpiece directly to the authentic Batcomputer Core and decoupling icon selections to protect the permanent background Wayne Crest watermark.
-
----
-
-## 👤 14. Author & Credits
+## 👤 17. Author & Credits
 
 * **Lead Architect & Creator:** **ADITYA MANOJ**
 * **Original Creator & Core Inspiration:** **[FatihMakes](https://github.com/FatihMakes)** — creator of [Mark-LIV](https://github.com/FatihMakes/Mark-LIV)

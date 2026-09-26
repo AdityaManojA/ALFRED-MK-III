@@ -193,6 +193,15 @@ def _calculate_similarity(query: str, candidate_text: str) -> float:
         return difflib.SequenceMatcher(None, q, c).ratio()
 
 
+# In-memory frame cache for ultra-fast repeated lookups (<1ms)
+_FRAME_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+
+
+def _get_frame_key(image_np: np.ndarray) -> str:
+    """Generate a lightweight key for the image frame."""
+    return f"{image_np.shape}_{image_np[0, 0].tolist()}_{image_np[-1, -1].tolist()}_{len(image_np)}"
+
+
 def _ocr_grounding(
     target: str,
     image_np: np.ndarray,
@@ -200,7 +209,7 @@ def _ocr_grounding(
     img_h: int,
 ) -> Tuple[Optional[Tuple[float, float]], float, str]:
     """
-    Run RapidOCR on image array to locate target text with early termination.
+    Run RapidOCR on image array to locate target text with early termination and frame caching.
     Returns: ((norm_x, norm_y), confidence, matched_text)
     """
     ocr = get_rapid_ocr()
@@ -208,11 +217,31 @@ def _ocr_grounding(
         return None, 0.0, ""
 
     try:
-        # Hierarchical strip search: UI controls (Save, File, Edit, Close) are often in top toolbar strip
-        # If searching a tall window (>200px), check top 75px toolbar first for ultra-low latency (<150ms)
+        frame_key = _get_frame_key(image_np)
+
+        # 1. Fast frame cache check
+        if frame_key in _FRAME_CACHE:
+            cached_boxes = _FRAME_CACHE[frame_key]
+            best_match = None
+            best_score = 0.0
+            best_text = ""
+            for item in cached_boxes:
+                sim = _calculate_similarity(target, item["text"])
+                combined = sim * item["conf"]
+                if combined > best_score:
+                    best_score = combined
+                    best_match = (item["norm_x"], item["norm_y"])
+                    best_text = item["text"]
+                if combined >= 0.85:
+                    return best_match, best_score, best_text
+            if best_match and best_score >= 0.80:
+                return best_match, best_score, best_text
+
+        # 2. Hierarchical strip search: UI controls (Save, File, Edit, Close) are in top toolbar strip
+        # If searching a tall window (>200px), check top 60px toolbar first for ultra-low latency (<100ms)
         search_strips = []
         if img_h > 200:
-            top_h = min(75, int(img_h * 0.15))
+            top_h = min(60, int(img_h * 0.12))
             search_strips.append((image_np[:top_h, :], 0, 0, top_h))
             search_strips.append((image_np, 0, 0, img_h))
         else:
@@ -221,6 +250,7 @@ def _ocr_grounding(
         best_match = None
         best_score = 0.0
         best_text = ""
+        cached_items = []
 
         for strip_img, offset_x, offset_y, strip_h in search_strips:
             # Check if fine-grained auto_text_det and text_rec are available for early break
@@ -235,20 +265,32 @@ def _ocr_grounding(
                     if not rec_res or not rec_res[0]:
                         continue
                     detected_text, ocr_conf = rec_res[0][0], float(rec_res[0][1])
+                    cx = (sum(p[0] for p in box) / 4.0) + offset_x
+                    cy = (sum(p[1] for p in box) / 4.0) + offset_y
+                    norm_x = round(float(cx / img_w), 4)
+                    norm_y = round(float(cy / img_h), 4)
+
+                    cached_items.append({
+                        "text": detected_text,
+                        "conf": ocr_conf,
+                        "norm_x": norm_x,
+                        "norm_y": norm_y,
+                    })
+
                     sim = _calculate_similarity(target, detected_text)
                     combined_conf = sim * ocr_conf
 
                     if combined_conf > best_score:
-                        cx = (sum(p[0] for p in box) / 4.0) + offset_x
-                        cy = (sum(p[1] for p in box) / 4.0) + offset_y
-                        norm_x = round(float(cx / img_w), 4)
-                        norm_y = round(float(cy / img_h), 4)
                         best_score = combined_conf
                         best_match = (norm_x, norm_y)
                         best_text = detected_text
 
                     # Early break as soon as a high-confidence match (>= 0.85) is found
                     if combined_conf >= 0.85:
+                        if frame_key not in _FRAME_CACHE:
+                            if len(_FRAME_CACHE) > 16:
+                                _FRAME_CACHE.clear()
+                            _FRAME_CACHE[frame_key] = cached_items
                         return best_match, best_score, best_text
             else:
                 results, _ = ocr(strip_img)
@@ -257,23 +299,39 @@ def _ocr_grounding(
 
                 for item in results:
                     box, detected_text, ocr_conf = item[0], item[1], float(item[2])
+                    cx = (sum(p[0] for p in box) / 4.0) + offset_x
+                    cy = (sum(p[1] for p in box) / 4.0) + offset_y
+                    norm_x = round(float(cx / img_w), 4)
+                    norm_y = round(float(cy / img_h), 4)
+                    cached_items.append({
+                        "text": detected_text,
+                        "conf": ocr_conf,
+                        "norm_x": norm_x,
+                        "norm_y": norm_y,
+                    })
+
                     sim = _calculate_similarity(target, detected_text)
                     combined_conf = sim * ocr_conf
 
                     if combined_conf > best_score:
-                        cx = (sum(p[0] for p in box) / 4.0) + offset_x
-                        cy = (sum(p[1] for p in box) / 4.0) + offset_y
-                        norm_x = round(float(cx / img_w), 4)
-                        norm_y = round(float(cy / img_h), 4)
                         best_score = combined_conf
                         best_match = (norm_x, norm_y)
                         best_text = detected_text
 
                     if combined_conf >= 0.85:
+                        if frame_key not in _FRAME_CACHE:
+                            if len(_FRAME_CACHE) > 16:
+                                _FRAME_CACHE.clear()
+                            _FRAME_CACHE[frame_key] = cached_items
                         return best_match, best_score, best_text
 
             if best_score >= 0.85:
                 break
+
+        if cached_items and frame_key not in _FRAME_CACHE:
+            if len(_FRAME_CACHE) > 16:
+                _FRAME_CACHE.clear()
+            _FRAME_CACHE[frame_key] = cached_items
 
         return best_match, best_score, best_text
     except Exception as e:
