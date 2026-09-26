@@ -472,6 +472,7 @@ class DashboardServer:
         self._pending_keys: dict[str, float] = {}
         self._device_sessions: dict[str, dict] = {}  # device_token → {session_key}
         self._phone_audio_queue: asyncio.Queue    = asyncio.Queue(maxsize=200)
+        self._audio_queue: asyncio.Queue          = asyncio.Queue(maxsize=200)
         self._background_tasks: dict[str, dict]   = {}
         self._uploads_dir                 = UPLOADS_DIR
         self._login_html                  = _read("login.html")
@@ -904,6 +905,75 @@ class DashboardServer:
                 pass
             finally:
                 self._clients.discard(websocket)
+
+        # ── Bidirectional audio WebSocket ─────────────────────────────────────
+        @app.websocket("/ws/audio")
+        async def audio_ws(websocket: WebSocket, token: str = ""):
+            """WebSocket endpoint for bidirectional audio streaming.
+
+            Receives: PCM 16kHz audio chunks from browser mic
+            Sends:    PCM 16kHz audio chunks of ALFRED's synthesized audio
+            """
+            tok = token.strip()
+            if not tok or tok not in self._tokens:
+                await websocket.close(code=4001)
+                return
+            await websocket.accept()
+
+            # Task to handle incoming audio from browser to ALFRED mic
+            async def handle_incoming_audio():
+                try:
+                    while True:
+                        data = await websocket.receive_bytes()
+                        # Route incoming client PCM chunks to main.py voice input buffer ([mic])
+                        # This mimics what the phone mic does
+                        try:
+                            self._phone_audio_queue.put_nowait(
+                                {"data": data, "mime_type": "audio/pcm"}
+                            )
+                        except asyncio.QueueFull:
+                            pass  # drop frame rather than block
+                        except Exception:
+                            pass
+                except WebSocketDisconnect:
+                    pass
+                except Exception:
+                    pass
+
+            # Task to handle outgoing audio from ALFRED to browser speakers
+            async def handle_outgoing_audio():
+                try:
+                    while True:
+                        # Get audio data from the audio queue (ALFRED's synthesized audio for WebSocket)
+                        try:
+                            # Wait for audio data with timeout to allow checking for disconnect
+                            audio_data = await asyncio.wait_for(
+                                self._audio_queue.get(),
+                                timeout=0.1
+                            )
+                            # Send the audio data back to the browser
+                            await websocket.send_bytes(audio_data["data"])
+                        except asyncio.TimeoutError:
+                            # Continue looping to check for disconnect
+                            continue
+                        except Exception:
+                            pass
+                except WebSocketDisconnect:
+                    pass
+                except Exception:
+                    pass
+
+            # Run both tasks concurrently
+            try:
+                await asyncio.gather(
+                    handle_incoming_audio(),
+                    handle_outgoing_audio()
+                )
+            except Exception:
+                pass
+            finally:
+                # Clean up any remaining tasks
+                pass
 
         return app
 
