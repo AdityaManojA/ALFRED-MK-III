@@ -1,15 +1,15 @@
-# 🦇 ALFRED — MARK III (Wayne Protocol Edition)
+# 🦇 ALFRED — MARK II (Wayne Protocol Edition)
 ### Autonomous Multimodal AI Desktop Assistant & Tactical Terminal
 **Architect & Lead Creator:** **ADITYA MANOJ**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![AI Backend](https://img.shields.io/badge/AI-Gemini%203.1%20Flash%20Live%20%7C%20Local%20Ollama-8E75B2.svg?logo=google&logoColor=white)](https://ai.google.dev/)
+[![AI Backend](https://img.shields.io/badge/AI-Gemini%203.5%20Flash%20Live%20%7C%20Local%20Ollama-8E75B2.svg?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Local LLMs](https://img.shields.io/badge/Local%20LLM-Ollama%20%7C%20LM%20Studio%20%7C%20vLLM-orange.svg)](https://ollama.com)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6%20Software%20Renderer-41CD52.svg?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
-[![AES-256 Remote](https://img.shields.io/badge/Mobile-Quantum%20Dashboard%20(iOS%2FAndroid)-00f0ff.svg)](https://github.com/AdityaManojA/ALFRED-MK-III)
+[![AES-256 Remote](https://img.shields.io/badge/Mobile-Quantum%20Dashboard%20(iOS%2FAndroid)-00f0ff.svg)](https://github.com/)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-> **ALFRED MARK-III** is an autonomous, real-time voice, vision, and system-control executive assistant built for complete digital sovereignty and tactical computing. Featuring native bidirectional audio streaming, real-time visual grounding, full desktop automation, high-performance long-term memory, and encrypted mobile remote telemetry.
+> **ALFRED MARK-II** is an autonomous, real-time voice, vision, and system-control executive assistant built for complete digital sovereignty and tactical computing. Featuring native bidirectional audio streaming, real-time visual grounding, full desktop automation, high-performance long-term memory, and encrypted mobile remote telemetry.
 
 ---
 
@@ -98,8 +98,8 @@ ALFRED is designed around uncompromising principles of system integrity, process
 
 | Subsystem | Architectural Implementation |
 |---|---|
-| ⚡ **Bidirectional Live Audio** | Native streaming via **Gemini 3.1 Flash Live** (or local Ollama/LM Studio streaming). Real-time natural speech with sub-second response latency. |
-| 🧑‍🎤 **Holographic 3D Avatar** | Pure software-rendered 3D head built on `QPainter` with zero GPU driver dependencies. Breathes, blinks, looks away while thinking, and glances at new events. |
+| ⚡ **Bidirectional Live Audio** | Native streaming via **Gemini 3.5 / 3.1 Flash Live** (or local Ollama/LM Studio streaming). Real-time natural speech with sub-second response latency. |
+| 🧑‍🎤 **Authentic Batcomputer Core** | Enforced default tactical centerpiece featuring a 3D vector globe, dynamic audio waveforms, and real-time hex matrix telemetry. |
 | 👄 **Formant & Viseme Lip-Sync** | ~50 mouth shapes/sec derived from real-time FFT audio formants (F1 openness, F2 spread/round) combined with Unicode articulatory decomposition across 20+ languages. |
 | 👁️ **Visual Multimodal Grounding** | On-demand single-frame capture of multi-monitor displays and webcams (`screen_processor.py`). Frame feeds are labelled by origin and injected into conversational context. |
 | 🎚️ **Global Push-to-Talk** | Hold `Ctrl+Space` to talk. Hardware mic remains completely shut off when idle. Polled at 30 Hz via Windows raw virtual key polling, window-scoped on macOS/Linux. |
@@ -145,10 +145,13 @@ ALFRED is designed around uncompromising principles of system integrity, process
 
 ---
 
-## 🛡️ 8. Real-Time Insignia & Chassis Hot-Swapper
+## 🛡️ 8. Decoupled Real-Time Insignia & Chassis Hot-Swapper
 
 * **Multi-Insignia Catalog**: Scans and registers brand assets from `Icons/` (Batman Beyond, Arkham Asylum, Classic Bat, White Bat, Tactical Stealth).
-* **Live Runtime Reconfiguration (`update_app_icon.py`)**: Hot-swaps the active application window icon, Windows taskbar insignia, and system tray in real time upon voice request (*"update the app icon to Batman Beyond"*) or via the Customise Assistant drawer.
+* **Decoupled Emblem Architecture**: Updating the active insignia (*"update the app icon to Batman Beyond"*) cleanly isolates HUD branding from application icons.
+  * **Header Icon**: Updates `self._header_icon_lbl` right next to `┌ ALFRED // MARK II ┐`.
+  * **OS Windows & Taskbar**: Dynamically updates `setWindowIcon` and system taskbar application process icons in real time.
+  * **Batcomputer Watermark**: Permanently locks and preserves the center background Wayne Crest watermark (`config/batman_logo.png` / `config/alfred_bg.png`) without distortion.
 * **Automatic Shortcut Synchronization**: Dynamically generates and updates `A.L.F.R.E.D.lnk` on the desktop without interrupting the running session.
 
 ---
@@ -158,10 +161,11 @@ ALFRED is designed around uncompromising principles of system integrity, process
 ```
 ALFRED-MK-II/
 ├── main.py                     # Main execution loop, Live WebSocket/Local LLM router, audio streams, tool dispatcher
-├── ui.py                       # PyQt6 HUD interface, holographic 3D avatar, audio visualizer, drawer settings
+├── ui.py                       # PyQt6 HUD interface, authentic Batcomputer tactical core, audio visualizer, drawer settings
 ├── setup.py                    # OS-aware package and dependency installer
 ├── core/
 │   ├── prompt.txt              # Master persona directives, execution rules & Heavenly Restriction
+│   ├── gemini.py               # Optimized Gemini API wrapper with active fallback ladders & 404 endpoint cooldowns
 │   ├── llm_client.py           # Dual-backend local LLM connector (Ollama / OpenAI-compatible / LM Studio)
 │   ├── action_loader.py        # Dynamic action discovery, parameter validation & Heavenly Restriction guard
 │   ├── plugin_loader.py        # Drop-in plugin discovery, sandboxing & isolation
@@ -286,7 +290,18 @@ This codebase is indexed with a persistent **GraphRAG Knowledge Graph** located 
 
 ---
 
-## 👤 13. Author & Credits
+## 🛠️ 13. Bug Fixes & System Patches
+
+* **Volume Popup GUI Fix**: Resolved a `NameError: name 'QPoint' is not defined` crash when clicking the volume HUD control by importing `QPoint` directly from `PyQt6.QtCore`.
+* **Gemini API 404 & Deprecated Model Ladder Patch**:
+  * Updated `_LADDERS` in `core/gemini.py` to route through active production endpoints (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-flash-latest`, `gemini-flash-lite-latest`) following Google's retirement of preview identifiers.
+  * Added dynamic 5-minute endpoint cooldowns when encountering `404 NOT_FOUND` responses to prevent repetitive failing calls.
+* **Automatic Function Calling (AFC) SDK Noise Suppression**: Silenced verbose Google GenAI SDK stderr recommendation warnings during one-shot execution calls by setting logger levels for `google.genai` and `google_genai` to `logging.ERROR`.
+* **HUD Streamlining & Emblem Decoupling**: Streamlined the tactical drawer controls by locking the HUD centerpiece directly to the authentic Batcomputer Core and decoupling icon selections to protect the permanent background Wayne Crest watermark.
+
+---
+
+## 👤 14. Author & Credits
 
 * **Lead Architect & Creator:** **ADITYA MANOJ**
 * **Original Creator & Core Inspiration:** **[FatihMakes](https://github.com/FatihMakes)** — creator of [Mark-LIV](https://github.com/FatihMakes/Mark-LIV)
