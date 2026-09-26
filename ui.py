@@ -1823,13 +1823,10 @@ class HudCanvas(QWidget):
         self._paint_globe_waveforms(p, cx, cy, W, H)
 
     def _draw_custom_emblem(self, p: QPainter, cx: float, cy: float, max_w: float, max_h: float) -> bool:
-        """If a custom emblem/logo file exists, draw it with smooth holographic styling."""
-        target_path = getattr(self, "_custom_emblem_path", None)
-        if target_path and Path(target_path).exists():
-            candidates = [Path(target_path)]
-        else:
-            cfg_dir = Path(__file__).resolve().parent / "config"
-            candidates = [cfg_dir / name for name in ("alfred_bg.png", "batman_logo.png", "hud_icon.png", "logo.png", "avatar.png", "custom_logo.png")]
+        """Always draw the authentic Wayne Crest watermark behind the Batcomputer UI."""
+        cfg_dir = Path(__file__).resolve().parent / "config"
+        # The background watermark is always the Wayne Crest (batman_logo.png / alfred_bg.png)
+        candidates = [cfg_dir / "batman_logo.png", cfg_dir / "alfred_bg.png"]
 
         for fp in candidates:
             if fp.exists():
@@ -1900,32 +1897,15 @@ class HudCanvas(QWidget):
                     p.setPen(QPen(blend(main, (1.0 - dist / 60.0) * 0.15), 1))
                     p.drawLine(QLineF(px1, py1, px2, py2))
 
-        # 3. Optional custom watermark emblem
+        # 3. Always Wayne Crest background watermark emblem
         self._draw_custom_emblem(p, cx, cy * 0.65, fw * 0.42, fw * 0.42)
 
-        # 4. Centerpiece Rendering
-        # Globe centerpiece (Screenshot 2 + Waveforms)
-        if self.hud_style == "globe" or (self._avatar is None and self.hud_style != "core"):
-            globe_r = min(fw * 0.35, 175.0)
-            globe_cy = cy * 0.72
-            self._paint_3d_vector_globe(p, cx, globe_cy, globe_r, W, H)
-            self._paint_globe_waveforms(p, cx, globe_cy + globe_r * 0.78, W, H)
-            self._paint_hex_matrix_stream(p, cx, globe_cy + globe_r * 0.78 + 36.0, W, H)
-
-        elif self._avatar is not None and self.hud_style == "face":
-            _band_t = 12.0
-            _band_h = max(60.0, cy + fw * 0.38 - _band_t)
-            _r_head = min(fw * 0.355, _band_h / (self._avatar.SPAN + 0.08))
-            _head_cy = _band_t + (_band_h - self._avatar.SPAN * _r_head) / 2.0 + _r_head
-            self._avatar.paint(p, cx, _head_cy, _r_head, main, acc, qcol(C.BG))
-            self._paint_globe_waveforms(p, cx, cy + fw * 0.42, W, H)
-
-        else:
-            _band_t = 12.0
-            _band_h = max(60.0, cy + fw * 0.38 - _band_t)
-            _r = min(W * 0.46, _band_h / 2.0)
-            self._paint_core(p, cx, _band_t + _band_h / 2.0, _r, W, _band_h)
-            self._paint_globe_waveforms(p, cx, cy + fw * 0.42, W, H)
+        # 4. Centerpiece Rendering: Always Batcomputer Tactical Core (Globe + Waveforms + Matrix)
+        globe_r = min(fw * 0.35, 175.0)
+        globe_cy = cy * 0.72
+        self._paint_3d_vector_globe(p, cx, globe_cy, globe_r, W, H)
+        self._paint_globe_waveforms(p, cx, globe_cy + globe_r * 0.78, W, H)
+        self._paint_hex_matrix_stream(p, cx, globe_cy + globe_r * 0.78 + 36.0, W, H)
 
         # 5. High-Impact Status Banner (Screenshot 2)
         self._paint_status_highlight_banner(p, cx, H - 34.0, W, H)
@@ -6451,11 +6431,29 @@ class MainWindow(QMainWindow):
 
         mid = QVBoxLayout(); mid.setSpacing(2)
         _disp = self._assistant_name.upper()
+
+        top_title_row = QHBoxLayout()
+        top_title_row.setSpacing(8)
+        top_title_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._header_icon_lbl = QLabel()
+        self._header_icon_lbl.setFixedSize(22, 22)
+        self._header_icon_lbl.setStyleSheet("background: transparent;")
+        if getattr(self, "_current_icon_path", None) and Path(self._current_icon_path).exists():
+            pm = QPixmap(self._current_icon_path)
+            if not pm.isNull():
+                self._header_icon_lbl.setPixmap(
+                    pm.scaled(22, 22, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                )
+        top_title_row.addWidget(self._header_icon_lbl)
+
         self._title_lbl = QLabel(f"┌  {_disp} // {APP_VERSION}  ┐")
         self._title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._title_lbl.setFont(mono_font(12, QFont.Weight.Bold, letter_spacing=2.5))
         self._title_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent;")
-        mid.addWidget(self._title_lbl)
+        top_title_row.addWidget(self._title_lbl)
+
+        mid.addLayout(top_title_row)
 
         self._sub_lbl = QLabel("WAYNE TECH PROTOCOL // TACTICAL CRT HUD")
         self._sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -6818,14 +6816,6 @@ class MainWindow(QMainWindow):
         lay.addWidget(self._ptt_btn)
 
         self._refresh_talk_btns()
-
-        self._hud_btn = QPushButton()
-        self._hud_btn.setFixedHeight(29)
-        self._hud_btn.setFont(mono_font(8, letter_spacing=0.5))
-        self._hud_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._hud_btn.clicked.connect(self._toggle_hud_style)
-        lay.addWidget(self._hud_btn)
-        self._refresh_hud_btn()
 
         audio_btn = QPushButton("[ ☊ ]  COWL ACOUSTIC ROUTING")
         audio_btn.setFixedHeight(29)
@@ -7718,41 +7708,12 @@ class MainWindow(QMainWindow):
 
 
     def _refresh_hud_btn(self):
-        from memory.config_manager import get_hud_style
-        face = get_hud_style() == "face"
-        # Neither state is "off", so both read as active — this is a choice
-        # between two things, not a switch with a disabled side.
-        style = f"""
-            QPushButton {{ background: rgba(142, 155, 255, 0.12); color: {C.PRI};
-                border: 1px solid {C.PRI}; border-radius: 2px;
-                text-align: left; padding: 0 10px; font-weight: bold; }}
-            QPushButton:hover {{ background: {C.PRI}; color: {C.DARK}; border: 1px solid {C.PRI}; }}
-            QPushButton:pressed {{ background: {C.PRI_DIM}; color: {C.DARK}; }}"""
-        self._hud_btn.setText("[ ◈ ]  HUD : HOLOGRAM AVATAR" if face
-                              else "[ ◈ ]  BATCOMPUTER TACTICAL CORE")
-        self._hud_btn.setStyleSheet(style)
-        self._hud_btn.setToolTip(
-            "An animated head that speaks your words and shows what ALFRED is "
-            "doing. Tap to switch to the reactor core."
-            if face else
-            "A reactor core that turns with the state and moves with your voice. "
-            "Tap to switch to the animated head.")
+        if hasattr(self, "_hud_btn") and self._hud_btn:
+            self._hud_btn.hide()
 
     def _toggle_hud_style(self):
-        """Swap the centrepiece. Both objects stay in memory, so the change is
-        instant and switching back costs nothing."""
-        from memory.config_manager import get_hud_style, save_hud_style
-        want = "core" if get_hud_style() == "face" else "face"
-        save_hud_style(want)
-        try:
-            self.hud.hud_style = want
-            self.hud.update()
-        except Exception:
-            pass
-        self._refresh_hud_btn()
-        self._log.append_log(
-            "SYS: HUD switched to the animated face." if want == "face"
-            else "SYS: HUD switched to the reactor core.")
+        # Hologram avatar option is removed per user request: always keep Batcomputer tactical core
+        pass
 
     def _toggle_ptt(self):
         from memory.config_manager import (get_push_to_talk_enabled,
@@ -8039,14 +8000,15 @@ class MainWindow(QMainWindow):
                 from memory.config_manager import save_app_icon
                 save_app_icon(resolved_path)
                 display_name = format_icon_display_name(Path(resolved_path).name)
+                # Update top header app icon next to MK-II
+                if hasattr(self, "_header_icon_lbl") and self._header_icon_lbl:
+                    pm = QPixmap(resolved_path)
+                    if not pm.isNull():
+                        self._header_icon_lbl.setPixmap(
+                            pm.scaled(22, 22, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                        )
                 if notify and hasattr(self, "_log") and self._log:
                     self._log.append_log(f"SYS: Insignia updated in realtime — {display_name}")
-                try:
-                    if hasattr(self, "hud") and self.hud:
-                        self.hud._custom_emblem_path = resolved_path
-                        self.hud.update()
-                except Exception:
-                    pass
                 return True
         except Exception as e:
             if hasattr(self, "_log") and self._log:

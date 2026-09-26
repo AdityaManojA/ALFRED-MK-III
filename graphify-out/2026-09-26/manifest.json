@@ -168,10 +168,10 @@
     "semantic_hash": "f4f424c4a165859a0e4f426427a64789"
   },
   "core/gemini.py": {
-    "mtime": 1790275670.9097624,
-    "seen": 1790278410.9365003,
-    "ast_hash": "e58dda32886cff6aad616905c5486aa2",
-    "semantic_hash": "e58dda32886cff6aad616905c5486aa2"
+    "mtime": 1790412007.4748173,
+    "seen": 1790412065.408735,
+    "ast_hash": "e356018d3533f8bd28637b0da998f2e9",
+    "semantic_hash": ""
   },
   "core/hotkey.py": {
     "mtime": 1790275670.9097624,
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "ui.py": {
-    "mtime": 1790411722.3216765,
-    "seen": 1790411782.904899,
-    "ast_hash": "e6cf3be7b922fb80f871edca695e8497",
+    "mtime": 1790411962.1122286,
+    "seen": 1790412065.408735,
+    "ast_hash": "06fed2492648ba388449d49f7e31d019",
     "semantic_hash": ""
   },
   ".agents/rules/graphify.md": {
