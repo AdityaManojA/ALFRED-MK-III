@@ -351,12 +351,25 @@ def _compare(items: list[str], aspect: str) -> str:
     except Exception as e:
         _log_gemini_failure("Gemini compare", e)
 
+    import concurrent.futures
+
     all_results: dict[str, list] = {}
-    for item in items:
+
+    def _fetch_item(it: str) -> tuple[str, list]:
         try:
-            all_results[item] = _ddg_search(f"{item} {aspect}", max_results=3)
+            return it, _ddg_search(f"{it} {aspect}", max_results=3)
         except Exception:
-            all_results[item] = []
+            return it, []
+
+    max_workers = min(5, len(items)) if items else 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {executor.submit(_fetch_item, item): item for item in items}
+        for future in concurrent.futures.as_completed(future_map):
+            try:
+                it, res = future.result()
+                all_results[it] = res
+            except Exception:
+                all_results[future_map[future]] = []
 
     lines = [f"Comparison — {aspect.upper()}", "─" * 40]
     for item in items:

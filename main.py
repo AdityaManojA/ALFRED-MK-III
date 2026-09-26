@@ -1708,13 +1708,28 @@ class JarvisLive:
                                 asyncio.create_task(_cam_close())
 
                     if response.tool_call:
-                        fn_responses = []
-                        for fc in response.tool_call.function_calls:
-                            _tlog("ALFRED", "phone", fc.name, self._dashboard)
-                            fr = await self._execute_tool(fc)
-                            fn_responses.append(fr)
+                        fcs = response.tool_call.function_calls or []
+                        # Concurrency-controlled worker pool (max 5 workers to avoid socket/resource exhaustion)
+                        _MAX_WORKERS = 5
+                        sem = asyncio.Semaphore(_MAX_WORKERS)
+
+                        async def _run_tool_bounded(fc):
+                            async with sem:
+                                _tlog("ALFRED", "phone", fc.name, self._dashboard)
+                                try:
+                                    return await self._execute_tool(fc)
+                                except Exception as err:
+                                    _tlog("ALFRED", "error", f"Tool {fc.name} error: {err}", self._dashboard)
+                                    return {
+                                        "id": getattr(fc, "id", None),
+                                        "name": fc.name,
+                                        "response": {"result": f"Execution error: {err}"}
+                                    }
+
+                        # Run promises concurrently with controlled worker pool, preserving item order
+                        fn_responses = await asyncio.gather(*[_run_tool_bounded(fc) for fc in fcs])
                         await self.session.send_tool_response(
-                            function_responses=fn_responses
+                            function_responses=list(fn_responses)
                         )
                         await self._flush_pending_vision()
         except Exception as e:
