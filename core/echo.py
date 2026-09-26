@@ -286,3 +286,18 @@ class EchoGuard:
             return False
         except Exception:
             return False      # any doubt: do not interrupt
+
+
+# ── Process-Level Audio Ducking Hooks ──────────────────────────────────────────
+try:
+    from core.audio_ducker import duck_media_apps, unduck_media_apps, is_ducked
+except Exception:
+    def duck_media_apps(volume_factor: float = 0.3, targets=None, sync: bool = False):
+        return {}
+
+    def unduck_media_apps(targets=None, sync: bool = False):
+        return {}
+
+    def is_ducked() -> bool:
+        return False
+

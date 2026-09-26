@@ -919,15 +919,28 @@ class JarvisLive:
 
     def set_speaking(self, value: bool):
         with self._speaking_lock:
+            was_speaking = self._is_speaking
             self._is_speaking = value
         if value:
             self._tail_until = 0.0
+            if not was_speaking:
+                try:
+                    from core.audio_ducker import duck_media_apps
+                    duck_media_apps(volume_factor=0.3)
+                except Exception:
+                    pass
         else:
             # Hold the guard open across the device's own output latency plus a
             # margin for the room. The microphone is NOT muted during it — the
             # guard still lets a genuine reply through, so answering instantly
             # still works. Only our own echo is dropped.
             self._tail_until = time.monotonic() + self._out_latency + _TAIL_MARGIN
+            if was_speaking:
+                try:
+                    from core.audio_ducker import unduck_media_apps
+                    unduck_media_apps()
+                except Exception:
+                    pass
         if not value:
             # The echo history is deliberately NOT cleared here: the tail above
             # still needs it to recognise our own voice. It is dropped when the
@@ -982,6 +995,11 @@ class JarvisLive:
     def interrupt(self) -> None:
         """Stop JARVIS mid-speech: drain queued audio and open mic immediately."""
         self._interrupted = True
+        try:
+            from core.audio_ducker import unduck_media_apps
+            unduck_media_apps()
+        except Exception:
+            pass
         q = self.audio_in_queue
         if q:
             drained = 0
@@ -1868,6 +1886,11 @@ class JarvisLive:
             raise
         finally:
             self.set_speaking(False)
+            try:
+                from core.audio_ducker import unduck_media_apps
+                unduck_media_apps()
+            except Exception:
+                pass
             stream.stop()
             stream.close()
 
