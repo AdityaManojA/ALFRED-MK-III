@@ -128,13 +128,23 @@ def _tlog(tag: str, icon_tag: str = "", text: str = "", dashboard=None):
         line = f"{_RED}[{tag}]{_RESET} {text}".strip()
     print(line)
     if dashboard:
+        msg = {
+            "type": "telemetry",
+            "tag": tag,
+            "icon": icon_tag,
+            "text": text,
+        }
         try:
-            asyncio.create_task(dashboard.broadcast({
-                "type": "telemetry",
-                "tag": tag,
-                "icon": icon_tag,
-                "text": text,
-            }))
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                loop.create_task(dashboard.broadcast(msg))
+        except RuntimeError:
+            dash_loop = getattr(dashboard, "_loop", None)
+            if dash_loop and dash_loop.is_running():
+                try:
+                    asyncio.run_coroutine_threadsafe(dashboard.broadcast(msg), dash_loop)
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -2658,6 +2668,7 @@ class JarvisLive:
         try:
             from dashboard.server import DashboardServer
             self._dashboard = DashboardServer()
+            self._dashboard._loop = self._loop
             self._dashboard.set_connect_callback(self._on_phone_connected)
             self._dashboard.set_clear_chat_callback(self._on_remote_clear_chat)
             asyncio.create_task(self._dashboard.serve())
@@ -2829,14 +2840,26 @@ class JarvisLive:
                     )
                     continue
 
-                # Invalid API key — stop hammering the API, prompt re-configuration
+                # Invalid API key — stop hammering the API
                 if "API key not valid" in err_str or "1007" in err_str:
-                    self.ui.write_log("ERR: API key invalid — please re-enter your key or choose local mode.")
+                    self.ui.write_log("ERR: API key invalid — update key in Alfred Settings [ ⚙ ] or choose local mode.")
                     self.ui.set_state("SLEEPING")
-                    self.ui.prompt_reconfig()
-                    while not self.ui._win._ready:
-                        await asyncio.sleep(1)
-                    # Check if user switched to a local offline backend (Ollama / LM Studio)
+                    # If config already has an API key configured, don't force setup overlay;
+                    # allow user to update via Settings button when ready.
+                    has_cfg_key = False
+                    try:
+                        cfg = json.loads(open(API_CONFIG_PATH, "r", encoding="utf-8").read())
+                        has_cfg_key = bool(cfg.get("gemini_api_key") or cfg.get("GEMINI_API_KEY") or cfg.get("api_key"))
+                    except Exception:
+                        pass
+                    if not has_cfg_key:
+                        self.ui.prompt_reconfig()
+                        while not self.ui._win._ready:
+                            await asyncio.sleep(1)
+                    else:
+                        await asyncio.sleep(10)
+
+                    # Check if user switched to a local offline backend (Ollama / LM Studio) or updated key
                     try:
                         cfg = json.loads(open(API_CONFIG_PATH, "r", encoding="utf-8").read())
                         new_prov = str(cfg.get("llm_provider", "gemini")).strip().lower()
@@ -2846,7 +2869,7 @@ class JarvisLive:
                             return
                     except Exception:
                         pass
-                    _tlog("ALFRED", "link", "New API key saved — reconnecting...", self._dashboard)
+                    _tlog("ALFRED", "link", "Reconnecting...", self._dashboard)
                     _conn_backoff = 3
                     continue
 

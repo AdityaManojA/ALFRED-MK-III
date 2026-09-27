@@ -46,7 +46,8 @@ def load_api_keys() -> dict:
         return {}
 
 def get_gemini_key() -> str | None:
-    return load_api_keys().get("gemini_api_key")
+    cfg = load_api_keys()
+    return cfg.get("gemini_api_key") or cfg.get("GEMINI_API_KEY") or cfg.get("api_key") or os.environ.get("GEMINI_API_KEY")
 
 def get_llm_provider() -> str:
     return load_api_keys().get("llm_provider", "gemini").lower()
@@ -57,7 +58,7 @@ def is_configured() -> bool:
     if provider in ("ollama", "openai", "lmstudio", "local"):
         return True
     key = get_gemini_key()
-    return bool(key and len(key) > 15)
+    return bool(key and len(key.strip()) > 5)
 
 
 def get_assistant_name() -> str:

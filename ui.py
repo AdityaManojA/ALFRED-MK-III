@@ -388,8 +388,8 @@ def _read_full_config() -> dict:
 
 # Single source of truth for the release name — the window title, the header
 # badge and the readme must never disagree again.
-APP_VERSION  = "MARK II"
-APP_PROTOCOL = "MK-II"
+APP_VERSION  = "MK-III"
+APP_PROTOCOL = "MK-III"
 
 _DEFAULT_W, _DEFAULT_H = 1060, 720
 _MIN_W,     _MIN_H     = 880, 600
@@ -1246,7 +1246,7 @@ class HudCanvas(QWidget):
             p.setFont(f_tele)
             p.setPen(QPen(blend(main, 0.40), 1))
             p.drawText(QRectF(cx - W / 2 + m + 6, cy - H / 2 + m, 120, 14),
-                       Qt.AlignmentFlag.AlignLeft, "MK-II // ARC-GEN")
+                       Qt.AlignmentFlag.AlignLeft, "MK-III // ARC-GEN")
             p.drawText(QRectF(cx + W / 2 - m - 126, cy - H / 2 + m, 120, 14),
                        Qt.AlignmentFlag.AlignRight, "FREQ 142.8MHz")
             p.drawText(QRectF(cx - W / 2 + m + 6, cy + H / 2 - m - 14, 120, 14),
@@ -1762,7 +1762,7 @@ class HudCanvas(QWidget):
             txt = "⊘  SILENCE PROTOCOL ENGAGED // ACOUSTICS MUTED"
             bar_col = qcol(C.MUTED_C)
         elif self.speaking:
-            txt = "●  VOCAL SYNTHESIS ACTIVE // ALFRED MK-II"
+            txt = "●  VOCAL SYNTHESIS ACTIVE // ALFRED MK-III"
             bar_col = main
         elif self.state == "THINKING":
             txt = "◈  NEURAL INFERENCE ACTIVE // PROCESSING DIRECTIVE"
@@ -1807,10 +1807,10 @@ class HudCanvas(QWidget):
         f_badge = mono_font(6, QFont.Weight.Bold)
         p.setFont(f_badge)
         p.setPen(QPen(QColor(main.red(), main.green(), main.blue(), 160), 1))
-        p.drawText(QRectF(m + 4, m + 2, 180, 12), Qt.AlignmentFlag.AlignLeft, "SUBJECT ALFRED.MK-II // VECTOR HUD")
+        p.drawText(QRectF(m + 4, m + 2, 180, 12), Qt.AlignmentFlag.AlignLeft, "SUBJECT ALFRED.MK-III // VECTOR HUD")
         p.drawText(QRectF(W - m - 184, m + 2, 180, 12), Qt.AlignmentFlag.AlignRight, "ORBITAL MATRIX: 4 ACTIVE")
         p.drawText(QRectF(m + 4, H - m - 14, 180, 12), Qt.AlignmentFlag.AlignLeft, "COORDS: 42°19'N 71°05'W")
-        p.drawText(QRectF(W - m - 184, H - m - 14, 180, 12), Qt.AlignmentFlag.AlignRight, "WAYNE TECH PROTOCOL MK-II")
+        p.drawText(QRectF(W - m - 184, H - m - 14, 180, 12), Qt.AlignmentFlag.AlignRight, "WAYNE TECH PROTOCOL MK-III")
 
         # Subtle CRT scanlines every 3px
         scan_col = QColor(main.red(), main.green(), main.blue(), 12)
@@ -2161,7 +2161,7 @@ class SubjectDossierCard(QWidget):
     """
     Tactical Dossier Card Widget (Screenshot 1: Exact recreation of SUBJECT A-34 metadata dossier).
     """
-    def __init__(self, assistant_name="ALFRED.MK-II", parent=None):
+    def __init__(self, assistant_name="ALFRED.MK-III", parent=None):
         super().__init__(parent)
         self.setFixedHeight(152)
         self._asst_name = assistant_name
@@ -3591,9 +3591,9 @@ class SetupOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             SetupOverlay {{
-                background: rgba(4, 15, 26, 0.98);
-                border: 1px solid rgba(0, 240, 255, 0.35);
-                border-radius: 16px;
+                background: {C.PANEL_BG};
+                border: 1px solid {C.BORDER_B};
+                border-radius: 4px;
             }}
         """)
 
@@ -3608,8 +3608,8 @@ class SetupOverlay(QWidget):
             self._provider = "gemini"
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 20, 28, 20)
-        layout.setSpacing(8)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(7)
 
         def _lbl(txt, font_size=9, bold=False, color=C.PRI,
                  align=Qt.AlignmentFlag.AlignCenter):
@@ -3621,12 +3621,37 @@ class SetupOverlay(QWidget):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        layout.addWidget(_lbl("◈  SYSTEM INITIALISATION", 12, True))
-        layout.addWidget(_lbl("Configure neural interface backend and credentials before first boot.", 8, color=C.PRI_DIM))
-        layout.addSpacing(4)
+        # Header with Title and Close Button
+        hdr_row = QHBoxLayout()
+        hdr_box = QVBoxLayout(); hdr_box.setSpacing(2)
+        hdr_box.addWidget(_lbl("◈  SYSTEM INITIALISATION // NEURAL BACKEND", 11, True, align=Qt.AlignmentFlag.AlignLeft))
+        hdr_box.addWidget(_lbl("Configure neural interface backend and credentials.", 8, color=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        hdr_row.addLayout(hdr_box)
+        hdr_row.addStretch()
+
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(26, 26)
+        close_btn.setFont(tech_font(9, QFont.Weight.Bold))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.05);
+                color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER_A};
+                border-radius: 13px;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 42, 85, 0.25);
+                color: #ffffff;
+                border-color: {C.RED};
+            }}
+        """)
+        close_btn.clicked.connect(self.hide)
+        hdr_row.addWidget(close_btn)
+        layout.addLayout(hdr_row)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color: rgba(0, 240, 255, 0.15);"); layout.addWidget(sep)
+        sep.setStyleSheet(f"color: {C.BORDER_A}; margin: 2px 0;"); layout.addWidget(sep)
         layout.addSpacing(2)
 
         # ── Backend Mode Selector ───────────────────────────────────────
@@ -3641,13 +3666,22 @@ class SetupOverlay(QWidget):
         ]:
             b = QPushButton(m_label)
             b.setFont(tech_font(8, QFont.Weight.Bold, 30))
-            b.setFixedHeight(30)
+            b.setFixedHeight(28)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(lambda _, k=m_key: self._set_backend(k))
             self._mode_btns[m_key] = b
             mode_row.addWidget(b)
         layout.addLayout(mode_row)
-        layout.addSpacing(4)
+        layout.addSpacing(2)
+
+        # Common input field styling
+        _inp_style = f"""
+            QLineEdit {{
+                background: {C.PANEL2}; color: {C.TEXT_BRIGHT};
+                border: 1px solid {C.BORDER_A}; border-radius: 2px; padding: 4px 8px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """
 
         # ── Provider Stack ──────────────────────────────────────────────
         self._provider_stack = QStackedWidget()
@@ -3657,18 +3691,14 @@ class SetupOverlay(QWidget):
         gemini_lay.setContentsMargins(0, 0, 0, 0); gemini_lay.setSpacing(4)
         gemini_lay.addWidget(_lbl("GEMINI API DIRECTIVE KEY", 8, bold=True, color=C.TEXT_DIM,
                                   align=Qt.AlignmentFlag.AlignLeft))
-        self._key_input = QLineEdit(cur_cfg.get("gemini_api_key", ""))
+        existing_key = (cur_cfg.get("gemini_api_key") or cur_cfg.get("GEMINI_API_KEY")
+                        or cur_cfg.get("api_key") or os.environ.get("GEMINI_API_KEY", ""))
+        self._key_input = QLineEdit(existing_key)
         self._key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._key_input.setPlaceholderText("AIzaSy... (free key from Google AI Studio)")
+        self._key_input.setPlaceholderText("AIzaSy... (key from Google AI Studio)")
         self._key_input.setFont(mono_font(9))
-        self._key_input.setFixedHeight(32)
-        self._key_input.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
-                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 8px; padding: 4px 10px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; background: rgba(0, 240, 255, 0.08); }}
-        """)
+        self._key_input.setFixedHeight(30)
+        self._key_input.setStyleSheet(_inp_style)
         gemini_lay.addWidget(self._key_input)
         gemini_hint = QLabel("Sub-second bidirectional voice stream via Google AI Studio WebSocket.")
         gemini_hint.setFont(tech_font(7))
@@ -3687,13 +3717,7 @@ class SetupOverlay(QWidget):
         self._ollama_url = QLineEdit(cur_cfg.get("llm_url", "http://localhost:11434"))
         self._ollama_url.setFont(mono_font(9))
         self._ollama_url.setFixedHeight(28)
-        self._ollama_url.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
-                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
-        """)
+        self._ollama_url.setStyleSheet(_inp_style)
         ollama_url_box.addWidget(self._ollama_url)
         ollama_url_row.addLayout(ollama_url_box, stretch=2)
 
@@ -3702,13 +3726,7 @@ class SetupOverlay(QWidget):
         self._ollama_model = QLineEdit(cur_cfg.get("llm_model", "llama3.2"))
         self._ollama_model.setFont(mono_font(9))
         self._ollama_model.setFixedHeight(28)
-        self._ollama_model.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
-                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
-        """)
+        self._ollama_model.setStyleSheet(_inp_style)
         ollama_model_box.addWidget(self._ollama_model)
         ollama_url_row.addLayout(ollama_model_box, stretch=2)
         ollama_lay.addLayout(ollama_url_row)
@@ -3721,10 +3739,10 @@ class SetupOverlay(QWidget):
             cb.setCursor(Qt.CursorShape.PointingHandCursor)
             cb.setStyleSheet(f"""
                 QPushButton {{
-                    background: rgba(255, 255, 255, 0.04); color: {C.TEXT_MED};
-                    border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 3px; padding: 0 6px;
+                    background: {C.PANEL2}; color: {C.TEXT_MED};
+                    border: 1px solid {C.BORDER_A}; border-radius: 2px; padding: 0 6px;
                 }}
-                QPushButton:hover {{ border-color: {C.PRI}; color: #ffffff; background: rgba(0, 240, 255, 0.10); }}
+                QPushButton:hover {{ border-color: {C.PRI}; color: #ffffff; background: rgba(142, 155, 255, 0.10); }}
             """)
             cb.clicked.connect(lambda _, m=chip_name: self._ollama_model.setText(m))
             chip_row.addWidget(cb)
@@ -3738,10 +3756,10 @@ class SetupOverlay(QWidget):
         self._probe_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._probe_btn.setStyleSheet(f"""
             QPushButton {{
-                background: rgba(0, 240, 255, 0.08); color: {C.PRI};
-                border: 1px solid {C.PRI}; border-radius: 4px; padding: 0 8px;
+                background: {C.PANEL2}; color: {C.PRI};
+                border: 1px solid {C.PRI}; border-radius: 2px; padding: 0 8px;
             }}
-            QPushButton:hover {{ background: rgba(0, 240, 255, 0.20); color: #ffffff; }}
+            QPushButton:hover {{ background: {C.PRI}; color: {C.DARK}; }}
         """)
         self._probe_btn.clicked.connect(self._probe_ollama)
         probe_row.addWidget(self._probe_btn)
@@ -3763,13 +3781,7 @@ class SetupOverlay(QWidget):
         self._lm_url = QLineEdit(cur_cfg.get("llm_url", "http://localhost:1234/v1"))
         self._lm_url.setFont(mono_font(9))
         self._lm_url.setFixedHeight(28)
-        self._lm_url.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
-                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
-        """)
+        self._lm_url.setStyleSheet(_inp_style)
         lm_url_box.addWidget(self._lm_url)
         lm_url_row.addLayout(lm_url_box, stretch=2)
 
@@ -3778,13 +3790,7 @@ class SetupOverlay(QWidget):
         self._lm_model = QLineEdit(cur_cfg.get("llm_model", "local-model"))
         self._lm_model.setFont(mono_font(9))
         self._lm_model.setFixedHeight(28)
-        self._lm_model.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(255, 255, 255, 0.05); color: {C.WHITE};
-                border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 6px; padding: 2px 8px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
-        """)
+        self._lm_model.setStyleSheet(_inp_style)
         lm_model_box.addWidget(self._lm_model)
         lm_url_row.addLayout(lm_model_box, stretch=2)
         lm_lay.addLayout(lm_url_row)
@@ -3796,10 +3802,10 @@ class SetupOverlay(QWidget):
         self._provider_stack.addWidget(lm_w)
 
         layout.addWidget(self._provider_stack)
-        layout.addSpacing(4)
+        layout.addSpacing(2)
 
         sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("color: rgba(0, 240, 255, 0.15);"); layout.addWidget(sep2)
+        sep2.setStyleSheet(f"color: {C.BORDER_A}; margin: 2px 0;"); layout.addWidget(sep2)
         layout.addSpacing(2)
 
         layout.addWidget(_lbl("TARGET OPERATING SYSTEM", 8, bold=True, color=C.TEXT_DIM,
@@ -3821,7 +3827,7 @@ class SetupOverlay(QWidget):
         layout.addLayout(os_row)
         self._sel_os_btn(detected)
         self._set_backend(self._provider)
-        layout.addSpacing(6)
+        layout.addSpacing(4)
 
         # Validation error banner
         self._err_lbl = QLabel("")
@@ -3831,28 +3837,58 @@ class SetupOverlay(QWidget):
         self._err_lbl.hide()
         layout.addWidget(self._err_lbl)
 
+        # Bottom action bar (Initialise Systems + Discard)
+        btn_row = QHBoxLayout(); btn_row.setSpacing(10)
+
         init_btn = QPushButton("▸  INITIALISE SYSTEMS")
-        init_btn.setFont(tech_font(9, QFont.Weight.Bold, 50))
+        init_btn.setFont(mono_font(8, QFont.Weight.Bold, letter_spacing=1.2))
         init_btn.setFixedHeight(36)
         init_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         init_btn.setStyleSheet(f"""
             QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0,240,255,0.35), stop:1 rgba(0,180,255,0.18));
-                color: #ffffff;
+                background: {C.PRI};
+                color: {C.DARK};
                 border: 1px solid {C.PRI};
-                border-radius: 8px;
+                border-radius: 2px;
+                font-weight: bold;
             }}
             QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0,240,255,0.55), stop:1 rgba(0,210,255,0.30));
-                border: 1px solid #ffffff;
-                color: #ffffff;
+                background: {C.TEXT_BRIGHT};
+                color: #000000;
+                border-color: #ffffff;
             }}
             QPushButton:pressed {{
-                background: rgba(0, 240, 255, 0.20);
+                background: {C.PRI_DIM};
+                color: {C.DARK};
             }}
         """)
         init_btn.clicked.connect(self._submit)
-        layout.addWidget(init_btn)
+        btn_row.addWidget(init_btn, stretch=2)
+
+        cancel_btn = QPushButton("DISCARD")
+        cancel_btn.setFixedHeight(36)
+        cancel_btn.setFont(mono_font(8, letter_spacing=0.8))
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2};
+                color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER_A};
+                border-radius: 2px;
+            }}
+            QPushButton:hover {{
+                color: #ffffff;
+                border-color: {C.PRI};
+                background: rgba(142, 155, 255, 0.10);
+            }}
+            QPushButton:pressed {{
+                background: rgba(142, 155, 255, 0.20);
+            }}
+        """)
+        cancel_btn.clicked.connect(self.hide)
+        btn_row.addWidget(cancel_btn, stretch=1)
+
+        layout.addLayout(btn_row)
 
     def _set_backend(self, key: str):
         self._provider = key
@@ -3863,37 +3899,35 @@ class SetupOverlay(QWidget):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: {C.PRI}; color: {C.DARK};
-                        border: none; border-radius: 6px; font-weight: bold;
+                        border: 1px solid {C.PRI}; border-radius: 2px; font-weight: bold;
                     }}
                 """)
             else:
                 btn.setStyleSheet(f"""
                     QPushButton {{
-                        background: rgba(255, 255, 255, 0.04); color: {C.TEXT_DIM};
-                        border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 6px;
+                        background: {C.PANEL2}; color: {C.TEXT_MED};
+                        border: 1px solid {C.BORDER_A}; border-radius: 2px;
                     }}
-                    QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.PRI}; background: rgba(0, 240, 255, 0.08); }}
+                    QPushButton:hover {{ color: {C.TEXT_BRIGHT}; border-color: {C.PRI}; background: rgba(142, 155, 255, 0.10); }}
                 """)
 
     def _sel_os_btn(self, key: str):
         self._sel_os = key
-        pal = {"windows":(C.PRI,"#001a22"),"mac":(C.ACC2,"#1a1400"),"linux":(C.GREEN,"#001a0d")}
         for k, btn in self._os_btns.items():
             if k == key:
-                fg, bg = pal[k]
                 btn.setStyleSheet(f"""
                     QPushButton {{
-                        background: {fg}; color: {bg};
-                        border: none; border-radius: 6px; font-weight: bold;
+                        background: {C.PRI}; color: {C.DARK};
+                        border: 1px solid {C.PRI}; border-radius: 2px; font-weight: bold;
                     }}
                 """)
             else:
                 btn.setStyleSheet(f"""
                     QPushButton {{
-                        background: rgba(255, 255, 255, 0.04); color: {C.TEXT_DIM};
-                        border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 6px;
+                        background: {C.PANEL2}; color: {C.TEXT_MED};
+                        border: 1px solid {C.BORDER_A}; border-radius: 2px;
                     }}
-                    QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.PRI}; background: rgba(0, 240, 255, 0.08); }}
+                    QPushButton:hover {{ color: {C.TEXT_BRIGHT}; border-color: {C.PRI}; background: rgba(142, 155, 255, 0.10); }}
                 """)
 
     def _probe_ollama(self):
@@ -4070,6 +4104,7 @@ class CustomizeOverlay(QWidget):
     Built with a responsive, scrollable core so controls never clip on any display.
     """
     saved = pyqtSignal(str, str, str, str)   # assistant_name, user_name, ui_color, voice
+    setup_api_requested = pyqtSignal()
     _OW, _OH = 560, 680
 
     def __init__(self, assistant_name="Alfred", user_name="",
@@ -4356,6 +4391,29 @@ class CustomizeOverlay(QWidget):
         self._hex_input.setStyleSheet(_fs)
         self._hex_input.textEdited.connect(self._on_hex_edited)
         lay.addWidget(self._hex_input)
+
+        lay.addSpacing(6)
+        lay.addWidget(_lbl("INTELLIGENCE BACKEND // API CREDENTIALS", 8, bold=True, color=C.TEXT_DIM))
+        api_btn = QPushButton("◈  SETUP API KEYS & NEURAL BACKEND")
+        api_btn.setFixedHeight(32)
+        api_btn.setFont(mono_font(8, QFont.Weight.Bold, letter_spacing=0.8))
+        api_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        api_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2};
+                color: {C.PRI};
+                border: 1px solid {C.PRI};
+                border-radius: 2px;
+                padding: 0 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background: {C.PRI};
+                color: {C.DARK};
+            }}
+        """)
+        api_btn.clicked.connect(lambda: self.setup_api_requested.emit())
+        lay.addWidget(api_btn)
 
         scroll.setWidget(body_widget)
         outer_lay.addWidget(scroll, stretch=1)
@@ -5384,6 +5442,7 @@ class PluginSettingsOverlay(QWidget):
     """
 
     _test_done = pyqtSignal(str, bool, str)   # namespace, ok, message
+    setup_api_requested = pyqtSignal()
     _OW = 460
 
     def __init__(self, sections: list[dict], parent=None):
@@ -5455,6 +5514,20 @@ class PluginSettingsOverlay(QWidget):
             """)
             save_btn.clicked.connect(self._save_all)
             btn_row.addWidget(save_btn)
+
+        api_btn = QPushButton("◈  SETUP API")
+        api_btn.setFixedHeight(34)
+        api_btn.setFont(mono_font(8, QFont.Weight.Bold, letter_spacing=0.5))
+        api_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        api_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.PRI};
+                border: 1px solid {C.PRI}; border-radius: 4px; padding: 0 10px;
+            }}
+            QPushButton:hover {{ background: {C.PRI}; color: {C.DARK}; }}
+        """)
+        api_btn.clicked.connect(lambda: self.setup_api_requested.emit())
+        btn_row.addWidget(api_btn)
 
         close_btn = QPushButton("CLOSE")
         close_btn.setFixedHeight(34)
@@ -7132,6 +7205,14 @@ class MainWindow(QMainWindow):
         settings_btn.clicked.connect(self._open_plugin_settings)
         lay.addWidget(settings_btn)
 
+        setup_api_btn = QPushButton("[ ◈ ]  SETUP API & BACKEND")
+        setup_api_btn.setFixedHeight(29)
+        setup_api_btn.setFont(mono_font(8, letter_spacing=0.5))
+        setup_api_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        setup_api_btn.setStyleSheet(_BTN_STYLE_PRI)
+        setup_api_btn.clicked.connect(self._open_api_setup)
+        lay.addWidget(setup_api_btn)
+
         w.adjustSize()
         return w
 
@@ -8238,6 +8319,7 @@ class MainWindow(QMainWindow):
             ov.on_preview = self._preview_ui_color
             ov.on_icon_change = self.set_app_icon
             ov.saved.connect(self._apply_name_update)
+            ov.setup_api_requested.connect(self._open_api_setup)
             ov.show()
             ov.raise_()
             self._customize_overlay = ov
@@ -8326,7 +8408,7 @@ class MainWindow(QMainWindow):
                 from memory.config_manager import save_app_icon
                 save_app_icon(resolved_path)
                 display_name = format_icon_display_name(Path(resolved_path).name)
-                # Update top header app icon next to MK-II
+                # Update top header app icon next to MK-III
                 if hasattr(self, "_header_icon_lbl") and self._header_icon_lbl:
                     pm = QPixmap(resolved_path)
                     if not pm.isNull():
@@ -8494,6 +8576,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, "_plugin_settings_overlay") and self._plugin_settings_overlay:
                 self._plugin_settings_overlay.hide()
             ov = PluginSettingsOverlay(sections, parent=cw)
+            ov.setup_api_requested.connect(self._open_api_setup)
             ow = PluginSettingsOverlay._OW
             oh = min(560, cw.height() - 16)
             ov.setGeometry(
@@ -8647,36 +8730,49 @@ class MainWindow(QMainWindow):
 
     def _check_config(self) -> bool:
         if not API_FILE.exists():
-            return False
+            env_k = os.environ.get("GEMINI_API_KEY", "").strip()
+            return bool(env_k and len(env_k) > 5)
         try:
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
             if not isinstance(d, dict):
                 return False
-            # If user has not explicitly chosen an intelligence backend yet,
-            # always present the SetupOverlay so they can choose Local (Ollama) vs Gemini.
-            if "llm_provider" not in d:
-                return False
 
-            provider = str(d.get("llm_provider", "")).strip().lower()
+            provider = str(d.get("llm_provider", "gemini")).strip().lower()
             if provider in ("ollama", "openai", "lmstudio", "local"):
                 # Local offline model configured — Gemini API key is NOT required
                 return True
 
-            if provider == "gemini":
-                key = d.get("gemini_api_key") or d.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-                if not key:
-                    return False
+            # If Gemini (or default): check for API key in config or environment
+            key = (
+                d.get("gemini_api_key")
+                or d.get("GEMINI_API_KEY")
+                or d.get("api_key")
+                or os.environ.get("GEMINI_API_KEY", "")
+            )
+            if key and isinstance(key, str) and len(key.strip()) > 5:
                 return True
+
+            # Also check if any other provider keys exist
+            for pk in ("openai_api_key", "groq_api_key", "anthropic_api_key"):
+                val = d.get(pk)
+                if val and isinstance(val, str) and len(val.strip()) > 5:
+                    return True
 
             return False
         except Exception:
             return False
 
     def _show_setup(self):
+        if hasattr(self, "_overlay") and self._overlay:
+            try:
+                self._overlay.hide()
+            except Exception:
+                pass
+            self._overlay = None
         ov = SetupOverlay(self.centralWidget())
         cw = self.centralWidget()
         ow = min(540, cw.width() - 40)
-        oh = min(460, cw.height() - 40)
+        oh = min(480, cw.height() - 40)
         ov.setGeometry(
             (cw.width()  - ow) // 2,
             (cw.height() - oh) // 2,
@@ -8684,7 +8780,20 @@ class MainWindow(QMainWindow):
         )
         ov.done.connect(self._on_setup_done)
         ov.show()
+        ov.raise_()
         self._overlay = ov
+
+    def _open_api_setup(self):
+        """Open the API key and neural backend configuration overlay from settings."""
+        if hasattr(self, "_quick_drawer") and self._quick_drawer.isVisible():
+            self._quick_drawer.hide()
+            if hasattr(self, "_drawer_btn"):
+                self._drawer_btn.setChecked(False)
+        if hasattr(self, "_customize_overlay") and self._customize_overlay and self._customize_overlay.isVisible():
+            self._customize_overlay.hide()
+        if hasattr(self, "_plugin_settings_overlay") and self._plugin_settings_overlay and self._plugin_settings_overlay.isVisible():
+            self._plugin_settings_overlay.hide()
+        self._show_setup()
 
     def _on_setup_done(self, config_data, os_name=None):
         os.makedirs(CONFIG_DIR, exist_ok=True)
