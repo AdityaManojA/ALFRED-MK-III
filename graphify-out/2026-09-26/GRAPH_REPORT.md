@@ -1,7 +1,7 @@
 # Graph Report - Alfred-Mark-III  (2026-09-26)
 
 ## Corpus Check
-- 94 files · ~184,227 words
+- 94 files · ~184,215 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 16 file(s) not represented in the graph (top: .ico 7, (none) 3, .bak 2)
 
